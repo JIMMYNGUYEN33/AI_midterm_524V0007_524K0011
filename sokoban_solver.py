@@ -36,7 +36,6 @@ class SokobanProblem:
                     self.initial_boxes.add((r, c))
 
     def _compute_all_goal_distances(self):
-        """Tính ma trận khoảng cách đường đi thực tế từ mọi ô tới các đích D (tránh tường)"""
         dist_matrix = {}
         for goal in self.goals:
             dist_matrix[goal] = {}
@@ -58,7 +57,6 @@ class SokobanProblem:
         return boxes == self.goals
 
     def is_corner_deadlock(self, r, c):
-        """Kiểm tra xem vị trí (r, c) có phải là góc chết không."""
         if (r, c) in self.goals:
             return False
         
@@ -100,10 +98,6 @@ class SokobanProblem:
         return successors
 
     def heuristic(self, state):
-        """
-        Heuristic: Tổng khoảng cách BFS ngắn nhất từ mỗi thùng tới ô đích gần nhất.
-        Đảm bảo admissibility & consistency, không dùng Euclidean/Manhattan.
-        """
         _, boxes = state
         total_h = 0
         available_goals = set(self.goals)
@@ -188,6 +182,52 @@ def solve_astar(problem):
     return None, float('inf'), nodes_expanded
 
 
+def verify_heuristic_properties(problem, path, optimal_cost):
+    print("\n" + "=" * 55)
+    print("--- KIỂM CHỨNG TÍNH CHẤT HEURISTIC (YÊU CẦU 4) ---")
+    
+    start_state = (problem.initial_agent, frozenset(problem.initial_boxes))
+    h_start = problem.heuristic(start_state)
+    
+    # 1. Admissibility: h(n) <= h*(n)
+    is_admissible = h_start <= optimal_cost
+    print(f"[1] Admissibility:")
+    print(f"    - h(start) = {h_start} | Chi phí thực h*(start) = {optimal_cost}")
+    print(f"    -> Kết luận thỏa h(n) <= h*(n): {is_admissible}")
+
+    # 2. Consistency: h(n) <= c(n, a, n') + h(n') với c = 1
+    curr_agent, curr_boxes = start_state
+    curr_boxes = set(curr_boxes)
+    consistent = True
+    
+    for step_idx, action in enumerate(path):
+        dr, dc = ACTIONS[action]
+        curr_state = (curr_agent, frozenset(curr_boxes))
+        h_curr = problem.heuristic(curr_state)
+        
+        next_agent = (curr_agent[0] + dr, curr_agent[1] + dc)
+        next_boxes = set(curr_boxes)
+        if next_agent in next_boxes:
+            box_next = (next_agent[0] + dr, next_agent[1] + dc)
+            next_boxes.remove(next_agent)
+            next_boxes.add(box_next)
+            
+        next_state = (next_agent, frozenset(next_boxes))
+        h_next = problem.heuristic(next_state)
+        
+        if h_curr > 1 + h_next:
+            consistent = False
+            print(f"    [!] Vi phạm tại bước {step_idx}: h(n)={h_curr} > 1 + h(n')={1 + h_next}")
+            break
+            
+        curr_agent = next_agent
+        curr_boxes = next_boxes
+
+    print(f"[2] Consistency:")
+    print(f"    -> Thỏa mãn h(n) <= 1 + h(n') trên toàn bộ lộ trình: {consistent}")
+    print("=" * 55)
+
+
 if __name__ == "__main__":
     map_path = "example_map.txt"
     print("--- ĐANG KHỞI TẠO BÀI TOÁN TỪ FILE MAP ---")
@@ -210,6 +250,8 @@ if __name__ == "__main__":
         print(f"   -> Số bước: {len(path_astar)}")
         print(f"   -> Lộ trình bước đi:")
         print(path_astar)
+        
+        verify_heuristic_properties(problem, path_astar, cost_astar)
     else:
         print("   -> A* không tìm thấy đường đi.")
 
