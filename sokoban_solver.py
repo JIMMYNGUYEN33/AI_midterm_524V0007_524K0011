@@ -1,11 +1,12 @@
 import heapq
+import time
 from collections import deque
 
 ACTIONS = {
-    'Up': (-1, 0),
-    'Down': (1, 0),
-    'Left': (0, -1),
-    'Right': (0, 1)
+    'North': (-1, 0),
+    'South': (1, 0),
+    'West': (0, -1),
+    'East': (0, 1)
 }
 
 class SokobanProblem:
@@ -98,6 +99,8 @@ class SokobanProblem:
                     d = self.dist_matrix[g][b]
                     if d < min_dist:
                         min_dist = d
+                if min_dist == float('inf'):
+                    return float('inf')  # Deadlock, không bao giờ tới đích  
             total_h += (min_dist if min_dist != float('inf') else 100)
         return total_h
 
@@ -161,3 +164,49 @@ def solve_astar(problem):
                 heapq.heappush(pq, (new_f, new_g, count, next_state, path + [action]))
 
     return None, float('inf'), nodes_expanded
+
+import time
+
+if __name__ == "__main__":
+    map_path = "example_map.txt"
+    print("--- ĐANG KHỞI TẠO BÀI TOÁN TỪ FILE MAP ---")
+    problem = SokobanProblem(map_path)
+    print(f"Agent tại: {problem.initial_agent}")
+    print(f"Số thùng: {len(problem.initial_boxes)} | Số đích: {len(problem.goals)}")
+    print("-" * 50)
+
+    # 1. Chạy thử thuật toán UCS
+    print("1. Đang chạy Uniform Cost Search (UCS)...")
+    start_time = time.time()
+    path_ucs, cost_ucs, nodes_ucs = solve_ucs(problem)
+    time_ucs = time.time() - start_time
+
+    if path_ucs is not None:
+        print(f"   -> Kết quả: THÀNH CÔNG")
+        print(f"   -> Thời gian chạy: {time_ucs:.4f} giây")
+        print(f"   -> Tổng chi phí (Cost): {cost_ucs}")
+        print(f"   -> Số Nodes đã duyệt (Space): {nodes_ucs}")
+        print(f"   -> Số bước: {len(path_ucs)}")
+    else:
+        print("   -> UCS không tìm thấy đường đi.")
+
+    print("-" * 50)
+
+    # 2. Chạy thử thuật toán A*
+    print("2. Đang chạy A* Search...")
+    start_time = time.time()
+    path_astar, cost_astar, nodes_astar = solve_astar(problem)
+    time_astar = time.time() - start_time
+
+    if path_astar is not None:
+        print(f"   -> Kết quả: THÀNH CÔNG")
+        print(f"   -> Thời gian chạy: {time_astar:.4f} giây")
+        print(f"   -> Tổng chi phí (Cost): {cost_astar}")
+        print(f"   -> Số Nodes đã duyệt (Space): {nodes_astar}")
+        print(f"   -> Số bước: {len(path_astar)}")
+        print(f"   -> Lộ trình bước đi:")
+        print(path_astar)
+    else:
+        print("   -> A* không tìm thấy đường đi.")
+
+    print("-" * 50)
