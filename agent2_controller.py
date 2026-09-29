@@ -32,7 +32,10 @@ class Agent2Bot:
     def get_action(self, my_pos, opp_pos, my_boxes, opp_boxes, neutral_boxes):
         start_time = time.time()
         all_boxes = set(my_boxes) | set(opp_boxes) | set(neutral_boxes)
-        target_boxes = list(neutral_boxes) + list(opp_boxes)
+        target_boxes = sorted(
+            list(neutral_boxes) + list(opp_boxes),
+            key=lambda b: abs(b[0] - my_pos[0]) + abs(b[1] - my_pos[1])
+        )
         obstacles = self.walls | all_boxes | {opp_pos}
 
         best_move = None

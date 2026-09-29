@@ -1,95 +1,53 @@
 import time
+import sys
+from engine import simultaneous_step
 from agent1_controller import Agent1Bot
 from agent2_controller import Agent2Bot
 
-ACTIONS = {
-    'North': (-1, 0),
-    'South': (1, 0),
-    'West': (0, -1),
-    'East': (0, 1)
-}
 
-def move_agent(pos, act, walls, opp_pos, my_boxes, opp_boxes, neutral_boxes, goals):
-    dr, dc = ACTIONS[act]
-    nxt = (pos[0] + dr, pos[1] + dc)
-    all_boxes = set(my_boxes) | set(opp_boxes) | set(neutral_boxes)
-
-    # Đụng tường hoặc đối thủ
-    if nxt in walls or nxt == opp_pos:
-        return pos
-
-    # Đẩy thùng
-    if nxt in all_boxes:
-        box_nxt = (nxt[0] + dr, nxt[1] + dc)
-        # Ô phía sau thùng bị chặn
-        if box_nxt in walls or box_nxt in all_boxes or box_nxt == opp_pos:
-            return pos
-        
-        # Di chuyển thùng thành công
-        if nxt in my_boxes: my_boxes.remove(nxt)
-        elif nxt in opp_boxes: opp_boxes.remove(nxt)
-        elif nxt in neutral_boxes: neutral_boxes.remove(nxt)
-
-        if box_nxt in goals:
-            my_boxes.add(box_nxt)
-        else:
-            neutral_boxes.add(box_nxt)
-
-    return nxt
-
-def simulate_competitive_game(n_steps=25):
-    # Khởi tạo bản đồ 7x7 thông thoáng
-    walls = set()
-    for r in range(7):
-        for c in range(7):
-            if r == 0 or r == 6 or c == 0 or c == 6:
-                walls.add((r, c))
-
-    # 2 đích ở 2 góc
+def make_map(size=7):
+    walls = {(r, c) for r in range(size) for c in range(size)
+             if r in (0, size - 1) or c in (0, size - 1)}
     goals = {(1, 3), (5, 3)}
-    
-    # 2 thùng trung lập ở giữa sân
-    neutral_boxes = {(3, 2), (3, 4)}
-    my_boxes = set()
-    opp_boxes = set()
+    neutral = {(3, 2), (3, 4)}
+    return walls, goals, neutral
 
-    # Vị trí xuất phát của 2 bot
-    agent1_pos = (1, 1)
-    agent2_pos = (5, 5)
 
-    bot1 = Agent1Bot(walls, goals)
-    bot2 = Agent2Bot(walls, goals)
-
-    print(f"=== BẮT ĐẦU ĐỐI KHÁNG TRONG {n_steps} BƯỚC ===")
+def play(cls1, cls2, n_steps=25, verbose=False):
+    walls, goals, neutral = make_map()
+    b1, b2 = set(), set()
+    p1, p2 = (1, 1), (5, 5)
+    bot1, bot2 = cls1(walls, goals), cls2(walls, goals)
 
     for step in range(1, n_steps + 1):
-        # 1. Thuật toán ra quyết định
-        t1 = time.time()
-        act1 = bot1.get_action(agent1_pos, agent2_pos, my_boxes, opp_boxes, neutral_boxes)
-        t1_used = (time.time() - t1) * 1000
+        t = time.time()
+        a1 = bot1.get_action(p1, p2, b1, b2, neutral)
+        ms1 = (time.time() - t) * 1000
+        t = time.time()
+        a2 = bot2.get_action(p2, p1, b2, b1, neutral)
+        ms2 = (time.time() - t) * 1000
 
-        t2 = time.time()
-        act2 = bot2.get_action(agent2_pos, agent1_pos, opp_boxes, my_boxes, neutral_boxes)
-        t2_used = (time.time() - t2) * 1000
+        p1, p2 = simultaneous_step(p1, p2, b1, b2, neutral, a1, a2, walls, goals,
+                           priority=1 if step % 2 else 2)
 
-        # 2. Thực hiện hành động đồng thời
-        agent1_pos = move_agent(agent1_pos, act1, walls, agent2_pos, my_boxes, opp_boxes, neutral_boxes, goals)
-        agent2_pos = move_agent(agent2_pos, act2, walls, agent1_pos, opp_boxes, my_boxes, neutral_boxes, goals)
+        if verbose:
+            print(f"Lượt {step:02d}: A1 [{a1:5s}] {p1} ({ms1:.1f}ms) | "
+                  f"A2 [{a2:5s}] {p2} ({ms2:.1f}ms) | {len(b1)} - {len(b2)}")
+    return len(b1), len(b2)
 
-        print(f"Lượt {step:02d}: A1 [{act1:5s}] pos={agent1_pos} ({t1_used:.1f}ms) | "
-              f"A2 [{act2:5s}] pos={agent2_pos} ({t2_used:.1f}ms) | "
-              f"Điểm: A1={len(my_boxes)} - A2={len(opp_boxes)}")
 
-    print("=" * 50)
-    print("KẾT THÚC:")
-    print(f"- Agent 1: {len(my_boxes)} thùng trong đích")
-    print(f"- Agent 2: {len(opp_boxes)} thùng trong đích")
-    if len(my_boxes) > len(opp_boxes):
-        print("=> AGENT 1 CHIẾN THẮNG!")
-    elif len(opp_boxes) > len(my_boxes):
-        print("=> AGENT 2 CHIẾN THẮNG!")
-    else:
-        print("=> HÒA!")
+def fairness_test(n_steps=25):
+    s1, s2 = play(Agent1Bot, Agent2Bot, n_steps)   
+    t2, t1 = play(Agent2Bot, Agent1Bot, n_steps)   
+    print(f"Ván 1 (Bot1 trên, Bot2 dưới): {s1} - {s2}")
+    print(f"Ván 2 (Bot2 trên, Bot1 dưới): {t2} - {t1}")
+    print(f"Tổng: Bot1 = {s1 + t1}, Bot2 = {s2 + t2}")
+
 
 if __name__ == "__main__":
-    simulate_competitive_game(n_steps=25)
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 25
+    print(f"=== ĐỐI KHÁNG {n} BƯỚC ===")
+    r1, r2 = play(Agent1Bot, Agent2Bot, n, verbose=True)
+    print("=> HÒA!" if r1 == r2 else f"=> AGENT {1 if r1 > r2 else 2} THẮNG!")
+    print("\n=== KIỂM TRA CÔNG BẰNG ===")
+    fairness_test(n)

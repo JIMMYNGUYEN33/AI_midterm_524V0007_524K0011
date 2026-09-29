@@ -3,7 +3,6 @@ import sys
 import demo_single_agents
 import demo_competitive
 
-# --- BẢNG MÀU TƯƠI SÁNG ---
 BG_COLOR = (135, 206, 235)       
 BTN_NORM = (41, 128, 185)      
 BTN_HOVER = (93, 173, 226)
@@ -16,11 +15,7 @@ BTN_QUIT_HOVER = (241, 148, 138)
 TITLE_COLOR = (255, 215, 0)      
 TEXT_COLOR = (255, 255, 255)
 
-def draw_text_with_shadow(surface, text, font, color, x, y):
-    shadow = font.render(text, True, (40, 40, 40))
-    shadow_rect = shadow.get_rect(center=(x + 4, y + 4))
-    surface.blit(shadow, shadow_rect)
-    
+def draw_text(surface, text, font, color, x, y):
     text_surf = font.render(text, True, color)
     text_rect = text_surf.get_rect(center=(x, y))
     surface.blit(text_surf, text_rect)
@@ -39,17 +34,16 @@ class Button:
         is_hover = self.rect.collidepoint(mouse_pos)
         color = self.hov_color if is_hover else self.norm_color
 
-        pygame.draw.rect(surface, (20, 20, 20), self.rect.move(5, 5), border_radius=20)
         pygame.draw.rect(surface, color, self.rect, border_radius=20)
-        pygame.draw.rect(surface, (255, 255, 255), self.rect, width=4, border_radius=20)
+        pygame.draw.rect(surface, (0, 0, 0), self.rect, width=4, border_radius=20)
         
-        draw_text_with_shadow(surface, self.text, self.font, TEXT_COLOR, self.rect.centerx, self.rect.centery)
+        draw_text(surface, self.text, self.font, TEXT_COLOR, self.rect.centerx, self.rect.centery)
         return is_hover
 
 def main_menu():
     pygame.init()
     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-    pygame.display.set_caption("Sokoban AI Challenge")
+    pygame.display.set_caption("Sokoban Game")
     
     WIDTH, HEIGHT = screen.get_width(), screen.get_height()
     
@@ -117,7 +111,7 @@ def main_menu():
 
         # ================= VẼ GIAO DIỆN THEO STATE ================= #
         if state == "MAIN":
-            draw_text_with_shadow(screen, "SOKOBAN AI CHALLENGE", font_title, TITLE_COLOR, cx, HEIGHT // 4)
+            draw_text(screen, "SOKOBAN GAME", font_title, TITLE_COLOR, cx, HEIGHT // 4)
             
             if btn_main_single.draw(screen) and mouse_click:
                 state = "SINGLE_MENU"
@@ -127,7 +121,7 @@ def main_menu():
                 running = False
 
         elif state == "SINGLE_MENU":
-            draw_text_with_shadow(screen, "SELECT ALGORITHM", font_title, TITLE_COLOR, cx, HEIGHT // 4)
+            draw_text(screen, "SELECT ALGORITHM", font_title, TITLE_COLOR, cx, HEIGHT // 4)
             
             if btn_alg_astar.draw(screen) and mouse_click:
                 demo_single_agents.run_game("A*")
@@ -139,7 +133,7 @@ def main_menu():
                 state = "MAIN"
 
         elif state == "COMP_MENU":
-            draw_text_with_shadow(screen, "COMPETITIVE SETTINGS", font_title, TITLE_COLOR, cx, HEIGHT // 4 - 30)
+            draw_text(screen, "COMPETITIVE SETTINGS", font_title, TITLE_COLOR, cx, HEIGHT // 4 - 30)
             
             # Label hướng dẫn
             lbl_surf = font_btn.render("ENTER MAX STEPS:", True, (40, 40, 40))
