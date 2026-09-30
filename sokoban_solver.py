@@ -3,10 +3,6 @@ import time
 from collections import deque
 
 
-# =========================================================
-# ACTIONS
-# =========================================================
-
 ACTIONS = {
     "North": (-1, 0),
     "South": (1, 0),
@@ -15,755 +11,213 @@ ACTIONS = {
 }
 
 
-# =========================================================
-# SOKOBAN PROBLEM
-# =========================================================
-
 class SokobanProblem:
-
     def __init__(self, map_file):
-
         self.map_file = map_file
-
         self.grid = []
-
         self.walls = set()
         self.goals = set()
         self.initial_boxes = set()
         self.initial_agent = None
 
-        # -------------------------------------------------
-        # READ MAP
-        # -------------------------------------------------
+        with open(map_file, "r", encoding="utf-8") as file:
+            lines = [line.rstrip("\n\r") for line in file]
 
-        with open(
-            map_file,
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            lines = [
-                line.rstrip("\n\r")
-                for line in f
-            ]
+        if not lines:
+            raise ValueError("Map file is empty.")
 
         self.rows = len(lines)
+        self.cols = max(len(line) for line in lines)
 
-        if self.rows == 0:
-            raise ValueError(
-                "Map file is empty."
-            )
-
-        self.cols = max(
-            len(line)
-            for line in lines
-        )
-
-        # -------------------------------------------------
-        # PARSE MAP
-        # -------------------------------------------------
-
-        for r, line in enumerate(lines):
-
-            row = list(
-                line.ljust(
-                    self.cols,
-                    " "
-                )
-            )
-
-            for c, char in enumerate(row):
-
-                pos = (r, c)
-
-                # Wall
+        for row_index, line in enumerate(lines):
+            row = list(line.ljust(self.cols, " "))
+            for col_index, char in enumerate(row):
+                position = (row_index, col_index)
                 if char == "%":
-
-                    self.walls.add(pos)
-
-                # Goal
+                    self.walls.add(position)
                 elif char == "D":
-
-                    self.goals.add(pos)
-
-                # Box
+                    self.goals.add(position)
                 elif char == "B":
-
-                    self.initial_boxes.add(pos)
-
-                # Agent
+                    self.initial_boxes.add(position)
                 elif char == "A":
-
-                    self.initial_agent = pos
-
-                # Box on goal
+                    self.initial_agent = position
                 elif char == "C":
-
-                    self.initial_boxes.add(pos)
-                    self.goals.add(pos)
-
+                    self.initial_boxes.add(position)
+                    self.goals.add(position)
             self.grid.append(row)
 
         if self.initial_agent is None:
+            raise ValueError("Map does not contain an agent 'A'.")
+        if len(self.initial_boxes) != len(self.goals):
+            raise ValueError("Number of boxes and goals must be equal.")
 
-            raise ValueError(
-                "Map does not contain an agent 'A'."
-            )
+        self.goal_distances = self._compute_goal_distances()
+        self._heuristic_cache = {}
 
-        if len(self.initial_boxes) != len(
-            self.goals
-        ):
-
-            raise ValueError(
-                "Number of boxes and goals "
-                "must be equal."
-            )
-
-        # Cache for heuristic
-        self.goal_distances = (
-            self._compute_goal_distances()
-        )
-
-    # =====================================================
-    # BOUNDS
-    # =====================================================
-
-    def in_bounds(self, pos):
-
-        r, c = pos
-
-        return (
-            0 <= r < self.rows
-            and
-            0 <= c < self.cols
-        )
-
-    # =====================================================
-    # WALKABLE
-    # =====================================================
-
-    def is_walkable(self, pos):
-
-        if not self.in_bounds(pos):
-            return False
-
-        return pos not in self.walls
-
-    # =====================================================
-    # GOAL TEST
-    # =====================================================
+    def in_bounds(self, position):
+        row, col = position
+        return 0 <= row < self.rows and 0 <= col < self.cols
 
     def is_goal(self, state):
-
-        agent, boxes = state
-
-        return set(boxes) == self.goals
-
-    # =====================================================
-    # SUCCESSORS
-    # =====================================================
+        return set(state[1]) == self.goals
 
     def get_successors(self, state):
-
         agent, boxes = state
-
         boxes = set(boxes)
 
         for action, (dr, dc) in ACTIONS.items():
+            next_agent = (agent[0] + dr, agent[1] + dc)
+            if not self.in_bounds(next_agent) or next_agent in self.walls:
+                continue
 
-            next_agent = (
-                agent[0] + dr,
-                agent[1] + dc
-            )
+            if next_agent not in boxes:
+                yield (next_agent, frozenset(boxes)), action, 1
+                continue
 
-            # Outside map
-            if not self.in_bounds(
-                next_agent
+            destination = (next_agent[0] + dr, next_agent[1] + dc)
+            if (
+                not self.in_bounds(destination)
+                or destination in self.walls
+                or destination in boxes
             ):
                 continue
 
-            # Wall
-            if next_agent in self.walls:
-                continue
-
-            # -------------------------------------------------
-            # NORMAL MOVE
-            # -------------------------------------------------
-
-            if next_agent not in boxes:
-
-                next_state = (
-                    next_agent,
-                    frozenset(boxes)
-                )
-
-                yield (
-                    next_state,
-                    action,
-                    1
-                )
-
-            # -------------------------------------------------
-            # PUSH BOX
-            # -------------------------------------------------
-
-            else:
-
-                box_destination = (
-                    next_agent[0] + dr,
-                    next_agent[1] + dc
-                )
-
-                # Outside map
-                if not self.in_bounds(
-                    box_destination
-                ):
-                    continue
-
-                # Wall
-                if box_destination in self.walls:
-                    continue
-
-                # Another box
-                if box_destination in boxes:
-                    continue
-
-                new_boxes = set(boxes)
-
-                new_boxes.remove(
-                    next_agent
-                )
-
-                new_boxes.add(
-                    box_destination
-                )
-
-                next_state = (
-                    next_agent,
-                    frozenset(new_boxes)
-                )
-
-                yield (
-                    next_state,
-                    action,
-                    1
-                )
-
-    # =====================================================
-    # ALIAS
-    # =====================================================
+            next_boxes = set(boxes)
+            next_boxes.remove(next_agent)
+            next_boxes.add(destination)
+            yield (next_agent, frozenset(next_boxes)), action, 1
 
     def successors(self, state):
-
-        yield from self.get_successors(
-            state
-        )
-
-    # =====================================================
-    # COMPUTE DISTANCE FROM GOALS
-    # =====================================================
+        yield from self.get_successors(state)
 
     def _compute_goal_distances(self):
-
-        all_distances = {}
-
+        distances_by_goal = {}
         for goal in self.goals:
-
-            distances = {
-                goal: 0
-            }
-
-            queue = deque(
-                [goal]
-            )
+            distances = {goal: 0}
+            queue = deque([goal])
 
             while queue:
-
                 current = queue.popleft()
-
-                r, c = current
-
                 for dr, dc in ACTIONS.values():
+                    previous_box = (current[0] - dr, current[1] - dc)
+                    required_agent = (current[0] - 2 * dr, current[1] - 2 * dc)
 
-                    nxt = (
-                        r + dr,
-                        c + dc
-                    )
-
-                    # IMPORTANT:
-                    # Keep BFS inside map
-                    if not self.in_bounds(
-                        nxt
+                    if (
+                        not self.in_bounds(previous_box)
+                        or not self.in_bounds(required_agent)
+                        or previous_box in self.walls
+                        or required_agent in self.walls
+                        or previous_box in distances
                     ):
                         continue
 
-                    if nxt in self.walls:
-                        continue
+                    distances[previous_box] = distances[current] + 1
+                    queue.append(previous_box)
 
-                    if nxt in distances:
-                        continue
-
-                    distances[nxt] = (
-                        distances[current] + 1
-                    )
-
-                    queue.append(
-                        nxt
-                    )
-
-            all_distances[goal] = distances
-
-        return all_distances
-
-    # =====================================================
-    # HEURISTIC
-    # =====================================================
+            distances_by_goal[goal] = distances
+        return distances_by_goal
 
     def heuristic(self, boxes):
+        key = frozenset(boxes)
+        if key in self._heuristic_cache:
+            return self._heuristic_cache[key]
 
-        boxes = set(boxes)
+        ordered_boxes = tuple(sorted(key))
+        ordered_goals = tuple(sorted(self.goals))
+        costs = {0: 0}
 
-        remaining_goals = set(
-            self.goals
-        )
+        for box in ordered_boxes:
+            next_costs = {}
+            for mask, current_cost in costs.items():
+                for index, goal in enumerate(ordered_goals):
+                    if mask & (1 << index):
+                        continue
 
-        total = 0
+                    distance = self.goal_distances[goal].get(box, float("inf"))
+                    if distance == float("inf"):
+                        continue
 
-        for box in boxes:
-
-            best_distance = float("inf")
-            best_goal = None
-
-            for goal in remaining_goals:
-
-                distance = (
-                    self.goal_distances
-                    .get(goal, {})
-                    .get(
-                        box,
-                        float("inf")
+                    new_mask = mask | (1 << index)
+                    new_cost = current_cost + distance
+                    next_costs[new_mask] = min(
+                        next_costs.get(new_mask, float("inf")),
+                        new_cost,
                     )
-                )
+            costs = next_costs
 
-                if distance < best_distance:
-
-                    best_distance = distance
-                    best_goal = goal
-
-            if best_goal is None:
-
-                return float("inf")
-
-            total += best_distance
-
-            remaining_goals.remove(
-                best_goal
-            )
-
-        return total
+        result = costs.get((1 << len(ordered_goals)) - 1, float("inf"))
+        self._heuristic_cache[key] = result
+        return result
 
 
-# =========================================================
-# RECONSTRUCT PATH
-# =========================================================
-
-def _reconstruct_path(
-    came_from,
-    current
-):
-
+def _reconstruct_path(came_from, current):
     path = []
-
     while current in came_from:
-
-        previous, action = (
-            came_from[current]
-        )
-
+        current, action = came_from[current]
         path.append(action)
-
-        current = previous
-
     path.reverse()
-
     return path
 
 
-# =========================================================
-# A*
-# =========================================================
-
-def solve_astar(
-    problem,
-    time_limit=30
-):
-
-    start_time = time.time()
-
-    start_state = (
-        problem.initial_agent,
-        frozenset(
-            problem.initial_boxes
-        )
-    )
-
-    # Priority queue:
-    # (f, counter, g, state)
-
+def _search(problem, use_heuristic, time_limit):
+    start_time = time.perf_counter()
+    start = (problem.initial_agent, frozenset(problem.initial_boxes))
     frontier = []
-
     counter = 0
-
-    start_h = problem.heuristic(
-        start_state[1]
-    )
-
-    heapq.heappush(
-        frontier,
-        (
-            start_h,
-            counter,
-            0,
-            start_state
-        )
-    )
-
+    initial_h = problem.heuristic(start[1]) if use_heuristic else 0
+    heapq.heappush(frontier, (initial_h, counter, 0, start))
     came_from = {}
-
-    cost_so_far = {
-        start_state: 0
-    }
-
+    cost_so_far = {start: 0}
     nodes_expanded = 0
 
     while frontier:
+        elapsed = time.perf_counter() - start_time
+        if elapsed > time_limit:
+            return [], nodes_expanded, elapsed
 
-        # Time limit
-        if (
-            time.time() - start_time
-            > time_limit
-        ):
-
-            return [], nodes_expanded, (
-                time.time() - start_time
-            )
-
-        (
-            _,
-            _,
-            current_cost,
-            current
-        ) = heapq.heappop(
-            frontier
-        )
+        _, _, current_cost, current = heapq.heappop(frontier)
+        if current_cost != cost_so_far.get(current):
+            continue
 
         nodes_expanded += 1
-
-        # Goal
         if problem.is_goal(current):
+            return _reconstruct_path(came_from, current), nodes_expanded, elapsed
 
-            path = _reconstruct_path(
-                came_from,
-                current
+        for next_state, action, step_cost in problem.get_successors(current):
+            new_cost = current_cost + step_cost
+            if new_cost >= cost_so_far.get(next_state, float("inf")):
+                continue
+
+            heuristic = problem.heuristic(next_state[1]) if use_heuristic else 0
+            if heuristic == float("inf"):
+                continue
+
+            cost_so_far[next_state] = new_cost
+            came_from[next_state] = (current, action)
+            counter += 1
+            heapq.heappush(
+                frontier,
+                (new_cost + heuristic, counter, new_cost, next_state),
             )
 
-            elapsed = (
-                time.time()
-                - start_time
-            )
-
-            return (
-                path,
-                nodes_expanded,
-                elapsed
-            )
-
-        # Successors
-        for (
-            next_state,
-            action,
-            step_cost
-        ) in problem.get_successors(
-            current
-        ):
-
-            new_cost = (
-                current_cost
-                + step_cost
-            )
-
-            if (
-                next_state not in cost_so_far
-                or
-                new_cost
-                < cost_so_far[next_state]
-            ):
-
-                cost_so_far[
-                    next_state
-                ] = new_cost
-
-                came_from[
-                    next_state
-                ] = (
-                    current,
-                    action
-                )
-
-                h = problem.heuristic(
-                    next_state[1]
-                )
-
-                if h == float("inf"):
-                    continue
-
-                counter += 1
-
-                priority = (
-                    new_cost + h
-                )
-
-                heapq.heappush(
-                    frontier,
-                    (
-                        priority,
-                        counter,
-                        new_cost,
-                        next_state
-                    )
-                )
-
-    elapsed = (
-        time.time()
-        - start_time
-    )
-
-    return (
-        [],
-        nodes_expanded,
-        elapsed
-    )
+    elapsed = time.perf_counter() - start_time
+    return [], nodes_expanded, elapsed
 
 
-# =========================================================
-# UCS
-# =========================================================
-
-def solve_ucs(
-    problem,
-    time_limit=30
-):
-
-    start_time = time.time()
-
-    start_state = (
-        problem.initial_agent,
-        frozenset(
-            problem.initial_boxes
-        )
-    )
-
-    frontier = []
-
-    counter = 0
-
-    heapq.heappush(
-        frontier,
-        (
-            0,
-            counter,
-            start_state
-        )
-    )
-
-    came_from = {}
-
-    cost_so_far = {
-        start_state: 0
-    }
-
-    nodes_expanded = 0
-
-    while frontier:
-
-        # Time limit
-        if (
-            time.time() - start_time
-            > time_limit
-        ):
-
-            return [], nodes_expanded, (
-                time.time() - start_time
-            )
-
-        (
-            current_cost,
-            _,
-            current
-        ) = heapq.heappop(
-            frontier
-        )
-
-        nodes_expanded += 1
-
-        # Goal
-        if problem.is_goal(current):
-
-            path = _reconstruct_path(
-                came_from,
-                current
-            )
-
-            elapsed = (
-                time.time()
-                - start_time
-            )
-
-            return (
-                path,
-                nodes_expanded,
-                elapsed
-            )
-
-        # Successors
-        for (
-            next_state,
-            action,
-            step_cost
-        ) in problem.get_successors(
-            current
-        ):
-
-            new_cost = (
-                current_cost
-                + step_cost
-            )
-
-            if (
-                next_state not in cost_so_far
-                or
-                new_cost
-                < cost_so_far[next_state]
-            ):
-
-                cost_so_far[
-                    next_state
-                ] = new_cost
-
-                came_from[
-                    next_state
-                ] = (
-                    current,
-                    action
-                )
-
-                counter += 1
-
-                heapq.heappush(
-                    frontier,
-                    (
-                        new_cost,
-                        counter,
-                        next_state
-                    )
-                )
-
-    elapsed = (
-        time.time()
-        - start_time
-    )
-
-    return (
-        [],
-        nodes_expanded,
-        elapsed
-    )
+def solve_astar(problem, time_limit=30):
+    return _search(problem, True, time_limit)
 
 
-# =========================================================
-# TEST
-# =========================================================
+def solve_ucs(problem, time_limit=30):
+    return _search(problem, True, time_limit)
+
 
 if __name__ == "__main__":
-
-    map_file = (
-        "maps/example_map.txt"
-    )
-
-    problem = SokobanProblem(
-        map_file
-    )
-
-    print("=" * 50)
-    print("SOKOBAN SOLVER")
-    print("=" * 50)
-
-    # -----------------------------------------------------
-    # A*
-    # -----------------------------------------------------
-
-    print("\nRunning A*...")
-
-    path_astar, nodes_astar, time_astar = (
-        solve_astar(problem)
-    )
-
-    if path_astar:
-
-        print("A* SUCCESS")
-        print(
-            "Cost:",
-            len(path_astar)
-        )
-        print(
-            "Steps:",
-            len(path_astar)
-        )
-        print(
-            "Nodes:",
-            nodes_astar
-        )
-        print(
-            "Time:",
-            round(time_astar, 3),
-            "seconds"
-        )
-
-    else:
-
-        print("A* FAILED")
-
-    # -----------------------------------------------------
-    # UCS
-    # -----------------------------------------------------
-
-    print("\nRunning UCS...")
-
-    path_ucs, nodes_ucs, time_ucs = (
-        solve_ucs(problem)
-    )
-
-    if path_ucs:
-
-        print("UCS SUCCESS")
-        print(
-            "Cost:",
-            len(path_ucs)
-        )
-        print(
-            "Steps:",
-            len(path_ucs)
-        )
-        print(
-            "Nodes:",
-            nodes_ucs
-        )
-        print(
-            "Time:",
-            round(time_ucs, 3),
-            "seconds"
-        )
-
-    else:
-
-        print("UCS FAILED")
+    for name, solver in (("A*", solve_astar), ("UCS", solve_ucs)):
+        problem = SokobanProblem("maps/example_map.txt")
+        path, nodes, elapsed = solver(problem)
+        status = "SUCCESS" if path else "FAILED"
+        print(f"{name} {status}")
+        print(f"Cost: {len(path)}")
+        print(f"Nodes: {nodes}")
+        print(f"Time: {elapsed:.3f} seconds")

@@ -21,7 +21,6 @@ class Agent2Bot:
         queue = deque([
             (agent_start, box_start, [])
         ])
-
         visited = {start}
 
         while queue and time.time() < deadline:

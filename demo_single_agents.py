@@ -432,5 +432,14 @@ def run_game(algorithm="A*"):
 
 if __name__ == "__main__":
 
-    run_game("A*")
+    selected_algorithm = (
+        sys.argv[1].upper()
+        if len(sys.argv) > 1
+        else "A*"
+    )
+
+    if selected_algorithm not in {"A*", "UCS"}:
+        raise SystemExit("Usage: python demo_single_agents.py [A*|UCS]")
+
+    run_game(selected_algorithm)
 

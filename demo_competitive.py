@@ -1,4 +1,7 @@
 
+import sys
+import time
+
 import pygame
 
 from agent1_controller import Agent1Bot
@@ -371,6 +374,7 @@ class CompetitiveGame:
         # Agent 1 chooses action
         # -----------------------------
 
+        started = time.perf_counter()
         action1 = self.agent1.get_action(
             self.agent1_pos,
             self.agent2_pos,
@@ -378,11 +382,14 @@ class CompetitiveGame:
             self.agent2_boxes,
             self.neutral_boxes
         )
+        if time.perf_counter() - started > 1.0:
+            action1 = "Wait"
 
         # -----------------------------
         # Agent 2 chooses action
         # -----------------------------
 
+        started = time.perf_counter()
         action2 = self.agent2.get_action(
             self.agent2_pos,
             self.agent1_pos,
@@ -390,6 +397,8 @@ class CompetitiveGame:
             self.agent1_boxes,
             self.neutral_boxes
         )
+        if time.perf_counter() - started > 1.0:
+            action2 = "Wait"
 
         # -----------------------------
         # Simultaneous movement
@@ -587,6 +596,7 @@ class CompetitiveGame:
 
     def restart(self):
 
+        max_steps = self.max_steps
         new_game = CompetitiveGame(
             self.map_file
         )
@@ -612,6 +622,7 @@ class CompetitiveGame:
         )
 
         self.step_count = 0
+        self.max_steps = max_steps
 
         self.history = []
 
@@ -732,7 +743,6 @@ class CompetitiveGame:
 # =========================================================
 
 def run_game(n_steps=25):
-
     game = CompetitiveGame(
         "maps/competitive_map.txt"
     )
@@ -748,4 +758,12 @@ def run_game(n_steps=25):
 
 if __name__ == "__main__":
 
-    run_game()
+    try:
+        steps = int(sys.argv[1]) if len(sys.argv) > 1 else 25
+    except ValueError as error:
+        raise SystemExit("Usage: python demo_competitive.py [number_of_steps]") from error
+
+    if steps < 1:
+        raise SystemExit("The number of steps must be positive.")
+
+    run_game(steps)
