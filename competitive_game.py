@@ -1,53 +1,138 @@
 import time
 import sys
+import pygame
 from engine import simultaneous_step
 from agent1_controller import Agent1Bot
 from agent2_controller import Agent2Bot
+from tile_renderer import TileRenderer
+
+class CompetitiveBoard:
+    def __init__(self, map_path):
+        self.grid = []
+        self.agent1_pos = None
+        self.agent2_pos = None
+        self.neutral_boxes = set()
+        self.b1 = set()
+        self.b2 = set()
+        self.targets = set()
+        self.walls = set()
+        self._load_map(map_path)
+        self.rows = len(self.grid)
+        self.cols = len(self.grid[0]) if self.rows > 0 else 0
+
+    def _load_map(self, filepath):
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+        max_len = max(len(line.strip('\n')) for line in lines)
+        for r, line in enumerate(lines):
+            row = list(line.strip('\n').ljust(max_len, ' '))
+            for c, char in enumerate(row):
+                if char == '%':
+                    self.walls.add((r, c))
+                elif char == '1':
+                    self.agent1_pos = (r, c)
+                    row[c] = ' '
+                elif char == '2':
+                    self.agent2_pos = (r, c)
+                    row[c] = ' '
+                elif char == 'B':
+                    self.neutral_boxes.add((r, c))
+                    row[c] = ' '
+                elif char == 'D':
+                    self.targets.add((r, c))
+                    row[c] = 'D'
+            self.grid.append(row)
+
+def play_competitive(map_path, n_steps=25):
+    pygame.init()
+    screen_w, screen_h = 800, 600
+    screen = pygame.display.set_mode((screen_w, screen_h))
+    pygame.display.set_caption("Sokoban Competitive AI")
+    clock = pygame.time.Clock()
+    font = pygame.font.Font(None, 32)
+
+    board = CompetitiveBoard(map_path)
+    renderer = TileRenderer(tile_size=48)
+    
+    offset_x = (screen_w - board.cols * 48) // 2
+    offset_y = (screen_h - board.rows * 48) // 2 + 40
+
+    bot1 = Agent1Bot(board.walls, board.targets)
+    bot2 = Agent2Bot(board.walls, board.targets)
+
+    step = 0
+    is_paused = True
+    game_over = False
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and not game_over:
+                    is_paused = not is_paused
+                elif event.key == pygame.K_RIGHT and is_paused and not game_over:
+                    step += 1
+                    take_turn(board, bot1, bot2, step)
+                elif event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+
+        if not is_paused and not game_over:
+            step += 1
+            take_turn(board, bot1, bot2, step)
+            pygame.time.delay(300)
+            
+        if step >= n_steps:
+            game_over = True
+            is_paused = True
+
+        screen.fill((40, 40, 40))
+        
+        score_text = f"STEP: {step}/{n_steps} | P1 (Blue): {len(board.b1)} - P2 (Orange): {len(board.b2)}"
+        text_surface = font.render(score_text, True, (255, 255, 255))
+        screen.blit(text_surface, (20, 15))
+        
+        if game_over:
+            result_str = "DRAW!"
+            if len(board.b1) > len(board.b2): result_str = "P1 WINS!"
+            elif len(board.b2) > len(board.b1): result_str = "P2 WINS!"
+            res_surface = font.render(f"GAME OVER - {result_str}", True, (255, 100, 100))
+            screen.blit(res_surface, (screen_w - 300, 15))
+
+        renderer.draw(screen, board, offset_x, offset_y)
+        pygame.display.flip()
+        clock.tick(30)
 
 
-def make_map(size=7):
-    walls = {(r, c) for r in range(size) for c in range(size)
-             if r in (0, size - 1) or c in (0, size - 1)}
-    goals = {(1, 3), (5, 3)}
-    neutral = {(3, 2), (3, 4)}
-    return walls, goals, neutral
+def take_turn(board, bot1, bot2, step):
+    t_start = time.time()
+    a1 = bot1.get_action(board.agent1_pos, board.agent2_pos, board.b1, board.b2, board.neutral_boxes)
+    if (time.time() - t_start) * 1000 > 1000:
+        a1 = "Wait"
 
+    t_start = time.time()
+    a2 = bot2.get_action(board.agent2_pos, board.agent1_pos, board.b2, board.b1, board.neutral_boxes)
+    if (time.time() - t_start) * 1000 > 1000:
+        a2 = "Wait"
 
-def play(cls1, cls2, n_steps=25, verbose=False):
-    walls, goals, neutral = make_map()
-    b1, b2 = set(), set()
-    p1, p2 = (1, 1), (5, 5)
-    bot1, bot2 = cls1(walls, goals), cls2(walls, goals)
-
-    for step in range(1, n_steps + 1):
-        t = time.time()
-        a1 = bot1.get_action(p1, p2, b1, b2, neutral)
-        ms1 = (time.time() - t) * 1000
-        t = time.time()
-        a2 = bot2.get_action(p2, p1, b2, b1, neutral)
-        ms2 = (time.time() - t) * 1000
-
-        p1, p2 = simultaneous_step(p1, p2, b1, b2, neutral, a1, a2, walls, goals,
-                           priority=1 if step % 2 else 2)
-
-        if verbose:
-            print(f"Lượt {step:02d}: A1 [{a1:5s}] {p1} ({ms1:.1f}ms) | "
-                  f"A2 [{a2:5s}] {p2} ({ms2:.1f}ms) | {len(b1)} - {len(b2)}")
-    return len(b1), len(b2)
-
-
-def fairness_test(n_steps=25):
-    s1, s2 = play(Agent1Bot, Agent2Bot, n_steps)   
-    t2, t1 = play(Agent2Bot, Agent1Bot, n_steps)   
-    print(f"Ván 1 (Bot1 trên, Bot2 dưới): {s1} - {s2}")
-    print(f"Ván 2 (Bot2 trên, Bot1 dưới): {t2} - {t1}")
-    print(f"Tổng: Bot1 = {s1 + t1}, Bot2 = {s2 + t2}")
+    priority = 1 if step % 2 != 0 else 2
+    
+    # Cập nhật để nhận lại 5 giá trị từ hàm engine mới
+    new_p1, new_p2, new_b1, new_b2, new_neutral = simultaneous_step(
+        board.agent1_pos, board.agent2_pos, 
+        board.b1, board.b2, board.neutral_boxes, 
+        a1, a2, board.walls, board.targets, priority
+    )
+    
+    board.agent1_pos = new_p1
+    board.agent2_pos = new_p2
+    board.b1 = new_b1
+    board.b2 = new_b2
+    board.neutral_boxes = new_neutral
 
 
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 25
-    print(f"=== ĐỐI KHÁNG {n} BƯỚC ===")
-    r1, r2 = play(Agent1Bot, Agent2Bot, n, verbose=True)
-    print("=> HÒA!" if r1 == r2 else f"=> AGENT {1 if r1 > r2 else 2} THẮNG!")
-    print("\n=== KIỂM TRA CÔNG BẰNG ===")
-    fairness_test(n)
+    n_input = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+    play_competitive("maps/competitive_map.txt", n_steps=n_input)

@@ -5,74 +5,190 @@ ACTIONS = {
     'North': (-1, 0),
     'South': (1, 0),
     'West': (0, -1),
-    'East': (0, 1)
+    'East': (0, 1),
+    'Wait': (0, 0)
 }
+
 
 class Agent2Bot:
     def __init__(self, walls, goals):
         self.walls = set(walls)
         self.goals = set(goals)
 
-    def _bfs_path(self, start, target, obstacles):
-        if start == target:
-            return []
-        queue = deque([(start, [])])
+    def _plan_box(self, agent_start, box_start, target_goals, obstacles, deadline):
+        start = (agent_start, box_start)
+
+        queue = deque([
+            (agent_start, box_start, [])
+        ])
+
         visited = {start}
-        while queue:
-            curr, path = queue.popleft()
-            if curr == target:
+
+        while queue and time.time() < deadline:
+            agent, box, path = queue.popleft()
+
+            if box in target_goals:
                 return path
-            for act, (dr, dc) in ACTIONS.items():
-                nxt = (curr[0] + dr, curr[1] + dc)
-                if nxt not in self.walls and nxt not in obstacles and nxt not in visited:
-                    visited.add(nxt)
-                    queue.append((nxt, path + [act]))
+
+            for action, (dr, dc) in ACTIONS.items():
+
+                if action == 'Wait':
+                    continue
+
+                nxt = (
+                    agent[0] + dr,
+                    agent[1] + dc
+                )
+
+                # Di chuyển bình thường
+                if nxt != box:
+
+                    if nxt in self.walls:
+                        continue
+
+                    if nxt in obstacles:
+                        continue
+
+                    state = (nxt, box)
+
+                    if state in visited:
+                        continue
+
+                    visited.add(state)
+
+                    queue.append(
+                        (
+                            nxt,
+                            box,
+                            path + [action]
+                        )
+                    )
+
+                    continue
+
+                # Đẩy box
+                new_box = (
+                    box[0] + dr,
+                    box[1] + dc
+                )
+
+                if new_box in self.walls:
+                    continue
+
+                if new_box in obstacles:
+                    continue
+
+                state = (box, new_box)
+
+                if state in visited:
+                    continue
+
+                visited.add(state)
+
+                queue.append(
+                    (
+                        box,
+                        new_box,
+                        path + [action]
+                    )
+                )
+
         return None
 
-    def get_action(self, my_pos, opp_pos, my_boxes, opp_boxes, neutral_boxes):
-        start_time = time.time()
-        all_boxes = set(my_boxes) | set(opp_boxes) | set(neutral_boxes)
-        target_boxes = sorted(
-            list(neutral_boxes) + list(opp_boxes),
-            key=lambda b: abs(b[0] - my_pos[0]) + abs(b[1] - my_pos[1])
+    def get_action(
+        self,
+        my_pos,
+        opp_pos,
+        my_boxes,
+        opp_boxes,
+        neutral_boxes
+    ):
+        deadline = time.time() + 0.75
+
+        all_boxes = (
+            set(my_boxes)
+            | set(opp_boxes)
+            | set(neutral_boxes)
         )
-        obstacles = self.walls | all_boxes | {opp_pos}
 
-        best_move = None
-        min_cost = float('inf')
+        targets = [
+            b for b in my_boxes
+            if b not in self.goals
+        ]
 
-        for box in target_boxes:
-            if time.time() - start_time > 0.8:
+        targets += [
+            b for b in neutral_boxes
+            if b not in self.goals
+        ]
+
+        targets += [
+            b for b in opp_boxes
+            if b not in self.goals
+        ]
+
+        # Agent 2 ưu tiên phía bên phải
+        targets.sort(
+            key=lambda b: (
+                b not in my_boxes,
+                b not in neutral_boxes,
+                -b[1],
+                b[0]
+            )
+        )
+
+        best_path = None
+        best_score = float('inf')
+
+        for box in targets:
+
+            if time.time() >= deadline:
                 break
-            for g in self.goals:
-                for act, (dr, dc) in ACTIONS.items():
-                    next_box = (box[0] + dr, box[1] + dc)
-                    if next_box in self.walls or next_box in all_boxes or next_box == opp_pos:
-                        continue
 
-                    push_pos = (box[0] - dr, box[1] - dc)
-                    if push_pos in self.walls or (push_pos in all_boxes and push_pos != my_pos) or push_pos == opp_pos:
-                        continue
+            obstacles = (
+                self.walls
+                | (all_boxes - {box})
+                | {opp_pos}
+            )
 
-                    box_to_goal = abs(next_box[0] - g[0]) + abs(next_box[1] - g[1])
-                    if my_pos == push_pos:
-                        if box_to_goal < min_cost:
-                            min_cost = box_to_goal
-                            best_move = act
-                    else:
-                        path_to_push = self._bfs_path(my_pos, push_pos, obstacles)
-                        if path_to_push:
-                            total_cost = len(path_to_push) + box_to_goal * 2
-                            if total_cost < min_cost:
-                                min_cost = total_cost
-                                best_move = path_to_push[0]
+            path = self._plan_box(
+                my_pos,
+                box,
+                self.goals,
+                obstacles,
+                deadline
+            )
 
-        if best_move:
-            return best_move
+            if path is None:
+                continue
 
-        for act, (dr, dc) in ACTIONS.items():
-            nxt = (my_pos[0] + dr, my_pos[1] + dc)
-            if nxt not in self.walls and nxt != opp_pos and nxt not in all_boxes:
-                return act
+            score = len(path)
 
-        return 'South'
+            if box in my_boxes:
+                score -= 20
+            elif box in neutral_boxes:
+                score -= 10
+
+            if score < best_score:
+                best_score = score
+                best_path = path
+
+        if best_path:
+            return best_path[0]
+
+        # Fallback
+        blocked = self.walls | all_boxes | {opp_pos}
+
+        for action, (dr, dc) in ACTIONS.items():
+
+            if action == 'Wait':
+                continue
+
+            nxt = (
+                my_pos[0] + dr,
+                my_pos[1] + dc
+            )
+
+            if nxt not in blocked:
+                return action
+
+        return 'Wait'
