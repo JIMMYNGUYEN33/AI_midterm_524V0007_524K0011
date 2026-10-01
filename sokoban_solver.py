@@ -51,12 +51,32 @@ class SokobanProblem:
         if len(self.initial_boxes) != len(self.goals):
             raise ValueError("Number of boxes and goals must be equal.")
 
+        self._neighbor_indices = self._build_neighbor_indices()
         self.goal_distances = self._compute_goal_distances()
         self._heuristic_cache = {}
 
     def in_bounds(self, position):
         row, col = position
         return 0 <= row < self.rows and 0 <= col < self.cols
+
+    def _build_neighbor_indices(self):
+        neighbors = []
+        for row in range(self.rows):
+            for col in range(self.cols):
+                position = (row, col)
+                if position in self.walls:
+                    neighbors.append((-1, -1, -1, -1))
+                    continue
+
+                adjacent = []
+                for dr, dc in ACTIONS.values():
+                    next_position = (row + dr, col + dc)
+                    if not self.in_bounds(next_position) or next_position in self.walls:
+                        adjacent.append(-1)
+                    else:
+                        adjacent.append(next_position[0] * self.cols + next_position[1])
+                neighbors.append(tuple(adjacent))
+        return tuple(neighbors)
 
     def is_goal(self, state):
         return set(state[1]) == self.goals
@@ -204,12 +224,80 @@ def _search(problem, use_heuristic, time_limit):
     return [], nodes_expanded, elapsed
 
 
+def _search_ucs(problem, time_limit):
+    start_time = time.perf_counter()
+    position_bits = max(1, (problem.rows * problem.cols - 1).bit_length())
+    position_mask = (1 << position_bits) - 1
+
+    start_agent = (
+        problem.initial_agent[0] * problem.cols
+        + problem.initial_agent[1]
+    )
+    start_boxes = sum(
+        1 << (row * problem.cols + col)
+        for row, col in problem.initial_boxes
+    )
+    goal_mask = sum(
+        1 << (row * problem.cols + col)
+        for row, col in problem.goals
+    )
+    start = (start_boxes << position_bits) | start_agent
+
+    frontier = deque([start])
+    visited = {start}
+    came_from = {}
+    nodes_expanded = 0
+    action_names = tuple(ACTIONS)
+
+    while frontier:
+        elapsed = time.perf_counter() - start_time
+        if elapsed > time_limit:
+            return [], nodes_expanded, elapsed
+
+        current = frontier.popleft()
+        agent = current & position_mask
+        boxes = current >> position_bits
+        nodes_expanded += 1
+
+        if boxes == goal_mask:
+            path = []
+            while current in came_from:
+                previous, action_index = came_from[current]
+                path.append(action_names[action_index])
+                current = previous
+            path.reverse()
+            return path, nodes_expanded, elapsed
+
+        for action_index, destination in enumerate(problem._neighbor_indices[agent]):
+            if destination < 0:
+                continue
+
+            destination_bit = 1 << destination
+            next_boxes = boxes
+            if boxes & destination_bit:
+                box_destination = problem._neighbor_indices[destination][action_index]
+                if box_destination < 0 or boxes & (1 << box_destination):
+                    continue
+                next_boxes = (boxes ^ destination_bit) | (1 << box_destination)
+
+            next_state = (next_boxes << position_bits) | destination
+            if next_state in visited:
+                continue
+
+            visited.add(next_state)
+            came_from[next_state] = (current, action_index)
+            frontier.append(next_state)
+
+    elapsed = time.perf_counter() - start_time
+    return [], nodes_expanded, elapsed
+
+
 def solve_astar(problem, time_limit=30):
     return _search(problem, True, time_limit)
 
 
 def solve_ucs(problem, time_limit=30):
-    return _search(problem, True, time_limit)
+    return _search_ucs(problem, time_limit)
 
 
 if __name__ == "__main__":

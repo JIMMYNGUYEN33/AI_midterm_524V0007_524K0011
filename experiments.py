@@ -7,9 +7,16 @@ from sokoban_solver import SokobanProblem, solve_astar, solve_ucs
 
 def benchmark(problem, solver, name, time_limit=8):
     problem._heuristic_cache.clear()
-    tracemalloc.start()
     started = time.perf_counter()
     path, expanded, elapsed = solver(problem, time_limit=time_limit)
+    wall_time = time.perf_counter() - started
+
+    memory_problem = SokobanProblem(problem.map_file)
+    tracemalloc.start()
+    memory_path, memory_expanded, _ = solver(
+        memory_problem,
+        time_limit=time_limit,
+    )
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
@@ -20,7 +27,9 @@ def benchmark(problem, solver, name, time_limit=8):
         "nodes": expanded,
         "time_seconds": elapsed,
         "peak_memory_mb": peak / (1024 * 1024),
-        "wall_time_seconds": time.perf_counter() - started,
+        "memory_run_solved": bool(memory_path),
+        "memory_run_nodes": memory_expanded,
+        "wall_time_seconds": wall_time,
     }
 
 
