@@ -41,38 +41,48 @@ class GameApp:
 
     def __init__(self, algorithm="A*"):
 
-        self.screen = pygame.display.set_mode(
-            (0, 0),
-            pygame.FULLSCREEN
-        )
-
-        pygame.display.set_caption(
-            f"Sokoban TDTU - {algorithm}"
-        )
-
+        pygame.init()
         pygame.font.init()
-
-        self.screen_w, self.screen_h = (
-            self.screen.get_size()
-        )
 
         self.algorithm = algorithm
 
-        # FIX:
-        # Map nằm trong thư mục maps
         self.map_file = "maps/example_map.txt"
 
         self.board = Board(
             self.map_file
         )
 
+        self.tile_size = 64
+        self.margin = 0
+        self.hud_gap = 0
+        self.hud_height = 80
+
+        board_width = self.board.cols * self.tile_size
+        board_height = self.board.rows * self.tile_size
+
+        self.screen_w = board_width + 2 * self.margin
+        self.screen_h = (
+            board_height
+            + 2 * self.margin
+            + self.hud_gap
+            + self.hud_height
+        )
+
+        self.screen = pygame.display.set_mode(
+            (self.screen_w, self.screen_h)
+        )
+
+        pygame.display.set_caption(
+            f"Sokoban TDTU - {algorithm}"
+        )
+
         self.renderer = TileRenderer(
-            tile_size=48
+            tile_size=self.tile_size
         )
 
         self.font_title = pygame.font.SysFont(
             "Impact",
-            32
+            24
         )
 
         self.font = pygame.font.SysFont(
@@ -83,19 +93,12 @@ class GameApp:
 
         self.small_font = pygame.font.SysFont(
             "Arial",
-            18,
+            14,
             bold=True
         )
 
-        self.offset_x = (
-            self.screen_w
-            - self.board.cols * 48
-        ) // 2
-
-        self.offset_y = (
-            self.screen_h
-            - self.board.rows * 48
-        ) // 2 - 60
+        self.offset_x = self.margin
+        self.offset_y = self.margin
 
         # Sokoban problem
         self.problem = SokobanProblem(
@@ -206,106 +209,60 @@ class GameApp:
 
     def draw_hud(self):
 
-        panel_w = 760
-        panel_h = 90
-
-        panel_x = (
-            self.screen_w
-            - panel_w
-        ) // 2
-
-        panel_y = (
-            self.screen_h
-            - panel_h
-            - 30
+        y = (
+            self.offset_y
+            + self.board.rows * self.tile_size
+            + self.hud_gap
         )
-
-        panel_rect = pygame.Rect(
-            panel_x,
-            panel_y,
-            panel_w,
-            panel_h
-        )
-
-        # Shadow
         pygame.draw.rect(
             self.screen,
-            (100, 150, 180),
-            panel_rect.move(4, 4),
-            border_radius=16
+            (245, 245, 245),
+            (0, y, self.screen_w, self.hud_height)
         )
 
-        # Main panel
-        pygame.draw.rect(
+        if not self.path:
+            status_text = "NO SOLUTION"
+            color_status = (231, 76, 60)
+        elif self.current_step >= len(self.path):
+            status_text = "FINISHED"
+            color_status = (46, 204, 113)
+        elif self.auto_play:
+            status_text = "PLAYING"
+            color_status = (46, 204, 113)
+        else:
+            status_text = "PAUSED"
+            color_status = (231, 76, 60)
+
+        draw_text(
             self.screen,
-            (255, 255, 255),
-            panel_rect,
-            border_radius=16
+            f"Mode: {self.algorithm}    Step: {self.current_step} / {len(self.path)}",
+            self.font,
+            (20, 20, 20),
+            10,
+            y + 5
         )
 
-        # Border
-        pygame.draw.rect(
+        draw_text(
             self.screen,
-            (200, 200, 200),
-            panel_rect,
-            width=3,
-            border_radius=16
-        )
-
-        # Step
-        step_text = (
-            f"MODE: {self.algorithm}"
-            f"   |   STEPS: "
-            f"{self.current_step}"
-            f" / {len(self.path)}"
-        )
-
-        status_text = (
-            "PLAYING"
-            if self.auto_play
-            else "PAUSED"
+            f"Status: {status_text}",
+            self.font,
+            color_status,
+            10,
+            y + 30
         )
 
         guide_text = (
-            "[SPACE]: Play/Pause   |   "
-            "[←] [→]: Move   |   "
-            "[ESC]: Menu"
+            "SPACE: Play/Pause   |   "
+            "LEFT/RIGHT: Step   |   "
+            "ESC: Exit"
         )
-
-        draw_text(
-            self.screen,
-            step_text,
-            self.font_title,
-            (41, 128, 185),
-            panel_x + 30,
-            panel_y + 15
-        )
-
-        color_status = (
-            (46, 204, 113)
-            if self.auto_play
-            else (231, 76, 60)
-        )
-
-        draw_text(
-            self.screen,
-            status_text,
-            self.font_title,
-            color_status,
-            panel_x + 550,
-            panel_y + 15
-        )
-
         self.screen.blit(
             self.small_font.render(
                 guide_text,
                 True,
                 (120, 120, 120)
             ),
-            (
-                panel_x + 30,
-                panel_y + 55
-            )
+            (10, y + 55)
         )
 
     # =====================================================
@@ -442,4 +399,3 @@ if __name__ == "__main__":
         raise SystemExit("Usage: python demo_single_agents.py [A*|UCS]")
 
     run_game(selected_algorithm)
-
