@@ -136,19 +136,4 @@ class Agent1Bot:
         if best_path:
             return best_path[0]
 
-        # Fallback
-        blocked = self.walls | all_boxes | {opp_pos}
-
-        for action, (dr, dc) in ACTIONS.items():
-            if action == 'Wait':
-                continue
-
-            nxt = (
-                my_pos[0] + dr,
-                my_pos[1] + dc
-            )
-
-            if nxt not in blocked:
-                return action
-
         return 'Wait'

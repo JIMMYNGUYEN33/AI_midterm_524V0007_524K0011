@@ -122,7 +122,7 @@ class GameApp:
     def _solve_and_build_timeline(self):
 
         print(
-            f"AI đang tìm đường đi bằng "
+            f"AI is searching with "
             f"{self.algorithm}..."
         )
 
@@ -141,7 +141,7 @@ class GameApp:
         if not self.path:
 
             print(
-                "Không tìm thấy lời giải."
+                "No solution found."
             )
 
             return
@@ -253,7 +253,7 @@ class GameApp:
 
         guide_text = (
             "SPACE: Play/Pause   |   "
-            "LEFT/RIGHT: Step   |   "
+            "Hold LEFT/RIGHT: Rewind/Forward   |   "
             "ESC: Exit"
         )
         self.screen.blit(
@@ -272,6 +272,10 @@ class GameApp:
     def run(self):
 
         clock = pygame.time.Clock()
+        left_held = False
+        right_held = False
+        manual_step_delay = 180
+        last_manual_step_time = 0
 
         while True:
 
@@ -308,6 +312,9 @@ class GameApp:
 
                             self.current_step += 1
 
+                        right_held = True
+                        last_manual_step_time = pygame.time.get_ticks()
+
                     # LEFT = previous step
                     elif event.key == pygame.K_LEFT:
 
@@ -316,6 +323,34 @@ class GameApp:
                         if self.current_step > 0:
 
                             self.current_step -= 1
+
+                        left_held = True
+                        last_manual_step_time = pygame.time.get_ticks()
+
+                elif event.type == pygame.KEYUP:
+
+                    if event.key == pygame.K_LEFT:
+                        left_held = False
+
+                    elif event.key == pygame.K_RIGHT:
+                        right_held = False
+
+            current_time = pygame.time.get_ticks()
+
+            if (
+                (left_held or right_held)
+                and current_time - last_manual_step_time
+                >= manual_step_delay
+            ):
+                self.auto_play = False
+
+                if left_held:
+                    if self.current_step > 0:
+                        self.current_step -= 1
+                elif self.current_step < len(self.path):
+                    self.current_step += 1
+
+                last_manual_step_time = current_time
 
             # =================================================
             # AUTO PLAY
@@ -387,15 +422,130 @@ def run_game(algorithm="A*"):
     app.run()
 
 
+def select_algorithm():
+
+    pygame.init()
+    pygame.font.init()
+
+    screen = pygame.display.set_mode((560, 380))
+    pygame.display.set_caption("Sokoban TDTU - Select Algorithm")
+    clock = pygame.time.Clock()
+
+    title_font = pygame.font.SysFont("Impact", 36)
+    font = pygame.font.SysFont("Arial", 22, bold=True)
+    small_font = pygame.font.SysFont("Arial", 16)
+
+    algorithms = ["A*", "UCS"]
+    selected_index = 0
+    algorithm_buttons = [
+        pygame.Rect(105, 190, 155, 64),
+        pygame.Rect(300, 190, 155, 64)
+    ]
+    start_button = pygame.Rect(180, 285, 200, 54)
+    background = (135, 206, 235)
+    ink = (34, 54, 75)
+    accent = (49, 112, 164)
+
+    while True:
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return None
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    return None
+
+                if event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                    selected_index = 1 - selected_index
+
+                elif event.key == pygame.K_1:
+                    selected_index = 0
+
+                elif event.key == pygame.K_2:
+                    selected_index = 1
+
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    pygame.quit()
+                    return algorithms[selected_index]
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+
+                for index, button in enumerate(algorithm_buttons):
+                    if button.collidepoint(event.pos):
+                        selected_index = index
+
+                if start_button.collidepoint(event.pos):
+                    pygame.quit()
+                    return algorithms[selected_index]
+
+        screen.fill(background)
+
+        pygame.draw.rect(
+            screen,
+            (248, 250, 252),
+            (40, 35, 480, 310),
+            border_radius=20
+        )
+
+        title = title_font.render("SOKOBAN", True, ink)
+        screen.blit(title, title.get_rect(center=(280, 88)))
+
+        subtitle = font.render("Choose a search algorithm", True, ink)
+        screen.blit(subtitle, subtitle.get_rect(center=(280, 140)))
+
+        for index, (algorithm, button) in enumerate(
+            zip(algorithms, algorithm_buttons)
+        ):
+            selected = index == selected_index
+            pygame.draw.rect(
+                screen,
+                accent if selected else (224, 233, 241),
+                button,
+                border_radius=12
+            )
+            label = font.render(
+                algorithm,
+                True,
+                (255, 255, 255) if selected else ink
+            )
+            screen.blit(label, label.get_rect(center=button.center))
+
+        pygame.draw.rect(
+            screen,
+            (53, 145, 101),
+            start_button,
+            border_radius=12
+        )
+        start_label = font.render("START GAME", True, (255, 255, 255))
+        screen.blit(start_label, start_label.get_rect(center=start_button.center))
+
+        # hint = small_font.render(
+        #     "Choose with the mouse or press 1 / 2, then Enter",
+        #     True,
+        #     (104, 119, 132)
+        # )
+        # screen.blit(hint, hint.get_rect(center=(280, 328)))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+
 if __name__ == "__main__":
 
-    selected_algorithm = (
-        sys.argv[1].upper()
-        if len(sys.argv) > 1
-        else "A*"
-    )
+    if len(sys.argv) > 1:
+        selected_algorithm = sys.argv[1].upper()
 
-    if selected_algorithm not in {"A*", "UCS"}:
-        raise SystemExit("Usage: python demo_single_agents.py [A*|UCS]")
+        if selected_algorithm not in {"A*", "UCS"}:
+            raise SystemExit("Usage: python demo_single_agents.py [A*|UCS]")
 
-    run_game(selected_algorithm)
+        run_game(selected_algorithm)
+    else:
+        selected_algorithm = select_algorithm()
+
+        if selected_algorithm is not None:
+            run_game(selected_algorithm)

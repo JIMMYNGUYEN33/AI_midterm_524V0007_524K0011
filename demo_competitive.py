@@ -151,6 +151,7 @@ class CompetitiveGame:
         self.max_steps = 25
 
         self.history = []
+        self.future_states = []
 
         self.game_over = False
 
@@ -160,10 +161,10 @@ class CompetitiveGame:
 
         self.auto_run = True
 
-        self.paused = False
+        self.paused = True
 
-        # Thời gian giữa mỗi bước
-        # 500 ms = 0.5 giây
+        # Delay between steps
+        # 500 ms = 0.5 seconds
         self.step_delay = 500
 
         self.last_step_time = pygame.time.get_ticks()
@@ -184,30 +185,22 @@ class CompetitiveGame:
 
     def save_state(self):
 
-        state = {
+        self.history.append(self.capture_state())
+        self.future_states.clear()
+
+
+    def capture_state(self):
+
+        return {
             "agent1_pos": self.agent1_pos,
             "agent2_pos": self.agent2_pos,
-
-            "agent1_boxes": set(
-                self.agent1_boxes
-            ),
-
-            "agent2_boxes": set(
-                self.agent2_boxes
-            ),
-
-            "neutral_boxes": set(
-                self.neutral_boxes
-            ),
-
+            "agent1_boxes": set(self.agent1_boxes),
+            "agent2_boxes": set(self.agent2_boxes),
+            "neutral_boxes": set(self.neutral_boxes),
             "step_count": self.step_count,
-
             "game_over": self.game_over,
-
             "result_text": self.result_text
         }
-
-        self.history.append(state)
 
 
     def restore_state(self, state):
@@ -380,7 +373,8 @@ class CompetitiveGame:
             action2,
 
             self.walls,
-            self.goals
+            self.goals,
+            priority=1 if self.step_count % 2 == 0 else 2
         )
 
 
@@ -395,7 +389,7 @@ class CompetitiveGame:
 
         self.step_count += 1
 
-        # Cập nhật cho TileRenderer
+        # Update the TileRenderer
         self.update_renderer_boxes()
 
         # Check winner
@@ -515,7 +509,7 @@ class CompetitiveGame:
 
     def draw_board(self):
 
-        # TileRenderer sẽ dùng:
+        # TileRenderer uses:
         #
         # wall.png
         # floor.png
@@ -570,12 +564,13 @@ class CompetitiveGame:
         self.max_steps = max_steps
 
         self.history = []
+        self.future_states = []
 
         self.game_over = False
 
         self.result_text = ""
 
-        self.paused = False
+        self.paused = True
 
         self.last_step_time = (
             pygame.time.get_ticks()
@@ -590,6 +585,9 @@ class CompetitiveGame:
         if not self.history:
             return
 
+        self.future_states.append(
+            self.capture_state()
+        )
         state = self.history.pop()
 
         self.restore_state(
@@ -599,10 +597,30 @@ class CompetitiveGame:
         self.paused = True
 
 
+    def forward(self):
+
+        if self.future_states:
+            self.history.append(
+                self.capture_state()
+            )
+            self.restore_state(
+                self.future_states.pop()
+            )
+        elif not self.game_over:
+            self.make_step()
+
+        self.paused = True
+        self.last_step_time = pygame.time.get_ticks()
+
+
 
     def run(self):
 
         running = True
+        left_held = False
+        right_held = False
+        manual_step_delay = 180
+        last_manual_step_time = 0
 
         while running:
 
@@ -625,7 +643,23 @@ class CompetitiveGame:
 
                     elif event.key == pygame.K_LEFT:
 
-                        self.backward()
+                        if not left_held:
+                            self.backward()
+                            last_manual_step_time = (
+                                pygame.time.get_ticks()
+                            )
+
+                        left_held = True
+
+                    elif event.key == pygame.K_RIGHT:
+
+                        if not right_held:
+                            self.forward()
+                            last_manual_step_time = (
+                                pygame.time.get_ticks()
+                            )
+
+                        right_held = True
 
                     elif event.key == pygame.K_r:
 
@@ -634,11 +668,30 @@ class CompetitiveGame:
                     elif event.key == pygame.K_ESCAPE:
 
                         running = False
+
+                elif event.type == pygame.KEYUP:
+
+                    if event.key == pygame.K_LEFT:
+                        left_held = False
+
+                    elif event.key == pygame.K_RIGHT:
+                        right_held = False
             
 
             current_time = (
                 pygame.time.get_ticks()
             )
+
+            if (
+                (left_held or right_held)
+                and current_time - last_manual_step_time >= manual_step_delay
+            ):
+                if left_held:
+                    self.backward()
+                else:
+                    self.forward()
+
+                last_manual_step_time = current_time
 
             if (
                 self.auto_run
@@ -678,16 +731,174 @@ def run_game(n_steps=25):
     game.run()
 
 
+def select_max_steps():
+
+    pygame.init()
+    pygame.font.init()
+
+    screen = pygame.display.set_mode((560, 400))
+    pygame.display.set_caption("Sokoban - Map 2 Setup")
+    clock = pygame.time.Clock()
+
+    title_font = pygame.font.SysFont("Impact", 34)
+    font = pygame.font.SysFont("Arial", 21, bold=True)
+    small_font = pygame.font.SysFont("Arial", 16)
+
+    step_field = pygame.Rect(165, 190, 230, 56)
+    start_button = pygame.Rect(180, 285, 200, 54)
+    steps_text = "25"
+    field_focused = True
+    error_text = ""
+    background = (135, 206, 235)
+    ink = (34, 54, 75)
+    accent = (49, 112, 164)
+    pygame.key.start_text_input()
+
+    while True:
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.key.stop_text_input()
+                pygame.quit()
+                return None
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_ESCAPE:
+                    pygame.key.stop_text_input()
+                    pygame.quit()
+                    return None
+
+                if event.key == pygame.K_RETURN:
+                    try:
+                        steps = int(steps_text)
+                    except ValueError:
+                        steps = 0
+
+                    if steps > 0:
+                        pygame.key.stop_text_input()
+                        pygame.quit()
+                        return steps
+
+                    error_text = "Enter a number of steps greater than 0."
+
+                elif event.key == pygame.K_BACKSPACE and field_focused:
+                    steps_text = steps_text[:-1]
+                    error_text = ""
+
+            elif event.type == pygame.TEXTINPUT and field_focused:
+                digits = "".join(
+                    character
+                    for character in event.text
+                    if character.isdecimal()
+                )
+                if digits and len(steps_text) + len(digits) <= 6:
+                    steps_text += digits
+                    error_text = ""
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                field_focused = step_field.collidepoint(event.pos)
+                if field_focused:
+                    pygame.key.start_text_input()
+                else:
+                    pygame.key.stop_text_input()
+
+                if start_button.collidepoint(event.pos):
+                    try:
+                        steps = int(steps_text)
+                    except ValueError:
+                        steps = 0
+
+                    if steps > 0:
+                        pygame.key.stop_text_input()
+                        pygame.quit()
+                        return steps
+
+                    error_text = "Enter a number of steps greater than 0."
+
+        screen.fill(background)
+
+        pygame.draw.rect(
+            screen,
+            (248, 250, 252),
+            (40, 35, 480, 330),
+            border_radius=20
+        )
+
+        title = title_font.render("SOKOBAN - MAP 2", True, ink)
+        screen.blit(title, title.get_rect(center=(280, 91)))
+
+        subtitle = font.render("Enter the step limit", True, ink)
+        screen.blit(subtitle, subtitle.get_rect(center=(280, 145)))
+
+        pygame.draw.rect(
+            screen,
+            (255, 255, 255),
+            step_field,
+            border_radius=10
+        )
+        pygame.draw.rect(
+            screen,
+            accent if field_focused else (190, 204, 216),
+            step_field,
+            width=2,
+            border_radius=10
+        )
+        steps_label = font.render(steps_text, True, ink)
+        steps_rect = steps_label.get_rect(center=step_field.center)
+        screen.blit(steps_label, steps_rect)
+
+        if field_focused and (pygame.time.get_ticks() // 500) % 2 == 0:
+            caret_x = steps_rect.right + 2
+            pygame.draw.line(
+                screen,
+                accent,
+                (caret_x, step_field.centery - 13),
+                (caret_x, step_field.centery + 13),
+                2
+            )
+
+        pygame.draw.rect(
+            screen,
+            (53, 145, 101),
+            start_button,
+            border_radius=12
+        )
+        start_label = font.render("START GAME", True, (255, 255, 255))
+        screen.blit(start_label, start_label.get_rect(center=start_button.center))
+
+        if error_text:
+            error = small_font.render(error_text, True, (190, 58, 50))
+            screen.blit(error, error.get_rect(center=(280, 260)))
+        else:
+            hint = small_font.render(
+                "Press Enter or click the button to start",
+                True,
+                (104, 119, 132)
+            )
+            screen.blit(hint, hint.get_rect(center=(280, 260)))
+
+        pygame.display.flip()
+        clock.tick(30)
 
 
 if __name__ == "__main__":
 
-    try:
-        steps = int(sys.argv[1]) if len(sys.argv) > 1 else 25
-    except ValueError as error:
-        raise SystemExit("Usage: python demo_competitive.py [number_of_steps]") from error
+    if len(sys.argv) > 1:
+        try:
+            steps = int(sys.argv[1])
+        except ValueError as error:
+            raise SystemExit(
+                "Usage: python demo_competitive.py [number_of_steps]"
+            ) from error
 
-    if steps < 1:
-        raise SystemExit("The number of steps must be positive.")
+        if steps < 1:
+            raise SystemExit("The number of steps must be positive.")
 
-    run_game(steps)
+        run_game(steps)
+    else:
+        steps = select_max_steps()
+
+        if steps is not None:
+            run_game(steps)

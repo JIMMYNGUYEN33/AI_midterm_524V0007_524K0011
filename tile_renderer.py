@@ -27,7 +27,7 @@ class TileRenderer:
 
             # Boxes
             'B': 'box.png',
-            'C': 'box_target.png',
+            'C': 'box.png',
             'C1': 'box1.png',
             'C2': 'box2.png'
         }
@@ -49,6 +49,28 @@ class TileRenderer:
                         img,
                         (self.tile_size, self.tile_size)
                     )
+
+                    if key == 'C':
+                        for x in range(img.get_width()):
+                            for y in range(img.get_height()):
+                                color = img.get_at((x, y))
+
+                                if color.a:
+                                    brightness = (
+                                        color.r * 299
+                                        + color.g * 587
+                                        + color.b * 114
+                                    ) / 255000
+
+                                    img.set_at(
+                                        (x, y),
+                                        (
+                                            int(55 + 105 * brightness),
+                                            int(30 + 66 * brightness),
+                                            int(12 + 34 * brightness),
+                                            color.a
+                                        )
+                                    )
 
                     self.sprites[key] = img
 
