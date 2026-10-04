@@ -6,13 +6,11 @@ ACTIONS = {
     'Wait': (0, 0)
 }
 
-
 def _add_positions(pos, delta):
     return (
         pos[0] + delta[0],
         pos[1] + delta[1]
     )
-
 
 def _plan_movement(
     pos,
@@ -28,11 +26,9 @@ def _plan_movement(
 
     next_pos = _add_positions(pos, delta)
 
-    # Không đi xuyên tường / agent kia
     if next_pos in walls or next_pos == opp_pos:
         return pos, None
 
-    # Nếu phía trước có box
     if next_pos in all_boxes:
 
         box_target = _add_positions(
@@ -40,15 +36,12 @@ def _plan_movement(
             delta
         )
 
-        # Không thể đẩy vào tường
         if box_target in walls:
             return pos, None
 
-        # Không thể đẩy vào box khác
         if box_target in all_boxes:
             return pos, None
 
-        # Không thể đẩy vào agent kia
         if box_target == opp_pos:
             return pos, None
 
@@ -58,7 +51,6 @@ def _plan_movement(
         )
 
     return next_pos, None
-
 
 def simultaneous_step(
     p1,
@@ -96,7 +88,6 @@ def simultaneous_step(
         all_boxes
     )
 
-    # Hai agent đi cùng một ô
     if t1 == t2:
 
         if priority == 1:
@@ -113,7 +104,6 @@ def simultaneous_step(
             push1 = None
             push2 = None
 
-    # Hai agent đổi chỗ cho nhau
     elif t1 == p2 and t2 == p1:
 
         t1 = p1
@@ -124,7 +114,6 @@ def simultaneous_step(
 
     else:
 
-        # Không cho push vào vị trí agent kia
         if push1 and (
             push1[1] == t2
             or push1[1] == p2
@@ -143,7 +132,6 @@ def simultaneous_step(
                 t2 = p2
                 push2 = None
 
-        # Hai agent cùng đẩy một box
         if push1 and push2:
 
             if push1[1] == push2[1]:
@@ -170,17 +158,14 @@ def simultaneous_step(
 
         src, dst = push
 
-        # Xóa box khỏi tất cả ownership
         new_b1.discard(src)
         new_b2.discard(src)
         new_neutral.discard(src)
 
-        # Nếu box được đưa vào goal
         if dst in goals:
             owner_set.add(dst)
 
         else:
-            # Box trở lại neutral
             new_neutral.add(dst)
 
     return (

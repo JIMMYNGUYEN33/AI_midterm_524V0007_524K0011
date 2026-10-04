@@ -2,39 +2,29 @@
 import pygame
 import os
 
-
 class TileRenderer:
     def __init__(self, tile_size=48):
         self.tile_size = tile_size
         self.sprites = {}
 
-        # Lấy đúng thư mục chứa tile_renderer.py
         base_dir = os.path.dirname(os.path.abspath(__file__))
         asset_dir = os.path.join(base_dir, "assets")
 
         mapping = {
-            # Map
             '%': 'wall.png',
             ' ': 'floor.png',
             'D': 'target.png',
 
-            # Single Agent
             'A': 'agent.png',
 
-            # Competitive Agents
             '1': 'agent1.png',
             '2': 'agent2.png',
 
-            # Boxes
             'B': 'box.png',
             'C': 'box.png',
             'C1': 'box1.png',
             'C2': 'box2.png'
         }
-
-        # ==============================
-        # LOAD SPRITES
-        # ==============================
 
         for key, filename in mapping.items():
 
@@ -110,9 +100,9 @@ class TileRenderer:
 
             else:
 
-                print(f"[WARNING] Image not found: {path}")
+                if key not in ('C1', 'C2'):
+                    print(f"[WARNING] Image not found: {path}")
 
-                # Fallback
                 surf = pygame.Surface(
                     (self.tile_size, self.tile_size)
                 )
@@ -149,27 +139,7 @@ class TileRenderer:
 
                 self.sprites[key] = surf
 
-    # =========================================================
-    # DRAW BOARD
-    # =========================================================
-
     def draw(self, screen, board, offset_x, offset_y):
-
-        # =====================================================
-        # 1. DRAW BASE MAP ONLY
-        # =====================================================
-        #
-        # QUAN TRỌNG:
-        # Không lấy agent/box trong board.grid để vẽ.
-        #
-        # board.grid là map ban đầu.
-        # Agent và box đã di chuyển nên vị trí trong grid
-        # có thể là vị trí CŨ.
-        #
-        # Vì vậy:
-        # A, 1, 2, B, C, C1, C2
-        # -> chỉ vẽ nền bên dưới.
-        # =====================================================
 
         dynamic_tiles = {
             'A',
@@ -197,13 +167,8 @@ class TileRenderer:
                     + r * self.tile_size
                 )
 
-                # ---------------------------------------------
-                # Dynamic object
-                # ---------------------------------------------
-
                 if char in dynamic_tiles:
 
-                    # Nếu vị trí này là goal
                     if (
                         hasattr(board, 'goals')
                         and (r, c) in board.goals
@@ -221,10 +186,8 @@ class TileRenderer:
 
                 else:
 
-                    # Static tile
                     sprite_key = char
 
-                # Nếu không có sprite
                 if sprite_key not in self.sprites:
                     sprite_key = ' '
 
@@ -239,15 +202,7 @@ class TileRenderer:
                     (x, y)
                 )
 
-        # =====================================================
-        # 2. COMPETITIVE MODE
-        # =====================================================
-
         if hasattr(board, 'neutral_boxes'):
-
-            # ---------------------------------------------
-            # Neutral boxes
-            # ---------------------------------------------
 
             for box in board.neutral_boxes:
 
@@ -266,10 +221,6 @@ class TileRenderer:
                     (x, y)
                 )
 
-            # ---------------------------------------------
-            # Agent 1 boxes
-            # ---------------------------------------------
-
             for box in board.b1:
 
                 x = (
@@ -287,10 +238,6 @@ class TileRenderer:
                     (x, y)
                 )
 
-            # ---------------------------------------------
-            # Agent 2 boxes
-            # ---------------------------------------------
-
             for box in board.b2:
 
                 x = (
@@ -307,10 +254,6 @@ class TileRenderer:
                     self.sprites['C2'],
                     (x, y)
                 )
-
-            # ---------------------------------------------
-            # Agent 1
-            # ---------------------------------------------
 
             if (
                 hasattr(board, 'agent1_pos')
@@ -332,10 +275,6 @@ class TileRenderer:
                     (x, y)
                 )
 
-            # ---------------------------------------------
-            # Agent 2
-            # ---------------------------------------------
-
             if (
                 hasattr(board, 'agent2_pos')
                 and board.agent2_pos is not None
@@ -356,15 +295,7 @@ class TileRenderer:
                     (x, y)
                 )
 
-        # =====================================================
-        # 3. SINGLE AGENT MODE
-        # =====================================================
-
         else:
-
-            # ---------------------------------------------
-            # Boxes
-            # ---------------------------------------------
 
             for box in board.boxes:
 
@@ -387,10 +318,6 @@ class TileRenderer:
                     self.sprites[sprite_key],
                     (x, y)
                 )
-
-            # ---------------------------------------------
-            # Agent
-            # ---------------------------------------------
 
             if (
                 hasattr(board, 'agent_pos')

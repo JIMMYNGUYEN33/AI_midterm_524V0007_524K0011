@@ -9,7 +9,6 @@ ACTIONS = {
     'Wait': (0, 0)
 }
 
-
 class Agent2Bot:
     def __init__(self, walls, goals):
         self.walls = set(walls)
@@ -41,7 +40,6 @@ class Agent2Bot:
                     agent[1] + dc
                 )
 
-                # Di chuyển bình thường
                 if nxt != box:
 
                     if nxt in self.walls:
@@ -67,7 +65,6 @@ class Agent2Bot:
 
                     continue
 
-                # Đẩy box
                 new_box = (
                     box[0] + dr,
                     box[1] + dc
@@ -128,7 +125,6 @@ class Agent2Bot:
             if b not in self.goals
         ]
 
-        # Agent 2 ưu tiên phía bên phải
         targets.sort(
             key=lambda b: (
                 b not in my_boxes,

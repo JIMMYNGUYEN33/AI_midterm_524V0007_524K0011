@@ -6,7 +6,6 @@ from board import Board
 from tile_renderer import TileRenderer
 from sokoban_solver import SokobanProblem, solve_astar, solve_ucs, ACTIONS
 
-
 def draw_text(
     surface,
     text,
@@ -35,7 +34,6 @@ def draw_text(
         text_surf,
         text_rect
     )
-
 
 class GameApp:
 
@@ -100,7 +98,6 @@ class GameApp:
         self.offset_x = self.margin
         self.offset_y = self.margin
 
-        # Sokoban problem
         self.problem = SokobanProblem(
             self.map_file
         )
@@ -115,10 +112,6 @@ class GameApp:
 
         self._solve_and_build_timeline()
 
-    # =====================================================
-    # SOLVE
-    # =====================================================
-
     def _solve_and_build_timeline(self):
 
         print(
@@ -128,15 +121,18 @@ class GameApp:
 
         if self.algorithm == "UCS":
 
-            self.path, _, _ = solve_ucs(
+            self.path, nodes_expanded, elapsed = solve_ucs(
                 self.problem
             )
 
         else:
 
-            self.path, _, _ = solve_astar(
+            self.path, nodes_expanded, elapsed = solve_astar(
                 self.problem
             )
+
+        print("Nodes:", nodes_expanded)
+        print(f"Time: {elapsed:.3f} seconds")
 
         if not self.path:
 
@@ -146,7 +142,9 @@ class GameApp:
 
             return
 
-        # Initial state
+        print("Actions:", self.path)
+        print("Total cost:", len(self.path))
+
         curr_agent = (
             self.problem.initial_agent
         )
@@ -162,7 +160,6 @@ class GameApp:
             )
         )
 
-        # Build timeline
         for act in self.path:
 
             dr, dc = ACTIONS[act]
@@ -176,7 +173,6 @@ class GameApp:
                 curr_boxes
             )
 
-            # Agent pushes a box
             if next_agent in next_boxes:
 
                 box_next = (
@@ -202,10 +198,6 @@ class GameApp:
             curr_agent = next_agent
 
             curr_boxes = next_boxes
-
-    # =====================================================
-    # HUD
-    # =====================================================
 
     def draw_hud(self):
 
@@ -265,10 +257,6 @@ class GameApp:
             (10, y + 55)
         )
 
-    # =====================================================
-    # RUN GAME
-    # =====================================================
-
     def run(self):
 
         clock = pygame.time.Clock()
@@ -281,26 +269,22 @@ class GameApp:
 
             for event in pygame.event.get():
 
-                # Close window
                 if event.type == pygame.QUIT:
 
                     return
 
                 if event.type == pygame.KEYDOWN:
 
-                    # ESC = back to menu
                     if event.key == pygame.K_ESCAPE:
 
                         return
 
-                    # SPACE = play / pause
                     elif event.key == pygame.K_SPACE:
 
                         self.auto_play = (
                             not self.auto_play
                         )
 
-                    # RIGHT = next step
                     elif event.key == pygame.K_RIGHT:
 
                         self.auto_play = False
@@ -315,7 +299,6 @@ class GameApp:
                         right_held = True
                         last_manual_step_time = pygame.time.get_ticks()
 
-                    # LEFT = previous step
                     elif event.key == pygame.K_LEFT:
 
                         self.auto_play = False
@@ -352,10 +335,6 @@ class GameApp:
 
                 last_manual_step_time = current_time
 
-            # =================================================
-            # AUTO PLAY
-            # =================================================
-
             if (
                 self.auto_play
                 and
@@ -366,10 +345,6 @@ class GameApp:
                 self.current_step += 1
 
                 pygame.time.wait(200)
-
-            # =================================================
-            # UPDATE BOARD
-            # =================================================
 
             if self.states:
 
@@ -386,10 +361,6 @@ class GameApp:
                 self.board.boxes = set(
                     boxes
                 )
-
-            # =================================================
-            # DRAW
-            # =================================================
 
             self.screen.fill(
                 (135, 206, 235)
@@ -408,11 +379,6 @@ class GameApp:
 
             clock.tick(30)
 
-
-# =========================================================
-# RUN GAME
-# =========================================================
-
 def run_game(algorithm="A*"):
 
     app = GameApp(
@@ -420,7 +386,6 @@ def run_game(algorithm="A*"):
     )
 
     app.run()
-
 
 def select_algorithm():
 
@@ -524,16 +489,8 @@ def select_algorithm():
         start_label = font.render("START GAME", True, (255, 255, 255))
         screen.blit(start_label, start_label.get_rect(center=start_button.center))
 
-        # hint = small_font.render(
-        #     "Choose with the mouse or press 1 / 2, then Enter",
-        #     True,
-        #     (104, 119, 132)
-        # )
-        # screen.blit(hint, hint.get_rect(center=(280, 328)))
-
         pygame.display.flip()
         clock.tick(30)
-
 
 if __name__ == "__main__":
 

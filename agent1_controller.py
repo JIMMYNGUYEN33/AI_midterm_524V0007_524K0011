@@ -9,7 +9,6 @@ ACTIONS = {
     'Wait': (0, 0)
 }
 
-
 class Agent1Bot:
     def __init__(self, walls, goals):
         self.walls = set(walls)
@@ -35,7 +34,6 @@ class Agent1Bot:
 
                 nxt = (agent[0] + dr, agent[1] + dc)
 
-                # Normal movement
                 if nxt != box:
                     if nxt in self.walls or nxt in obstacles:
                         continue
@@ -48,7 +46,6 @@ class Agent1Bot:
                     queue.append((nxt, box, path + [action]))
                     continue
 
-                # Push box
                 new_box = (box[0] + dr, box[1] + dc)
 
                 if new_box in self.walls:
@@ -84,8 +81,6 @@ class Agent1Bot:
             | set(neutral_boxes)
         )
 
-        # Ưu tiên box của mình, sau đó box neutral,
-        # cuối cùng mới lấy box của đối thủ.
         targets = [
             b for b in my_boxes
             if b not in self.goals

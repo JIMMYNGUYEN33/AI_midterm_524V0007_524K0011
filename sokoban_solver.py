@@ -309,3 +309,4 @@ if __name__ == "__main__":
         print(f"Cost: {len(path)}")
         print(f"Nodes: {nodes}")
         print(f"Time: {elapsed:.3f} seconds")
+        print()
