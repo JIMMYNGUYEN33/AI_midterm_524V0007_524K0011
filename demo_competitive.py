@@ -21,9 +21,6 @@ class CompetitiveGame:
 
         self.map_file = map_file
 
-        # =================================================
-        # LOAD MAP
-        # =================================================
 
         with open(
             map_file,
@@ -43,7 +40,6 @@ class CompetitiveGame:
             for line in self.map_lines
         )
 
-        # Grid dùng cho TileRenderer
         self.grid = []
 
         self.walls = set()
@@ -56,9 +52,7 @@ class CompetitiveGame:
         self.agent2_boxes = set()
         self.neutral_boxes = set()
 
-        # =================================================
-        # PARSE MAP
-        # =================================================
+    
 
         for r, line in enumerate(
             self.map_lines
@@ -106,9 +100,7 @@ class CompetitiveGame:
                     self.neutral_boxes.add(pos)
                     self.goals.add(pos)
 
-        # =================================================
-        # SCREEN
-        # =================================================
+    
 
         self.tile_size = 64
 
@@ -136,17 +128,11 @@ class CompetitiveGame:
 
         self.clock = pygame.time.Clock()
 
-        # =================================================
-        # TILE RENDERER
-        # =================================================
 
         self.renderer = TileRenderer(
             self.tile_size
         )
 
-        # =================================================
-        # AGENTS
-        # =================================================
 
         self.agent1 = Agent1Bot(
             self.walls,
@@ -158,9 +144,7 @@ class CompetitiveGame:
             self.goals
         )
 
-        # =================================================
-        # GAME STATE
-        # =================================================
+ 
 
         self.step_count = 0
 
@@ -172,9 +156,7 @@ class CompetitiveGame:
 
         self.result_text = ""
 
-        # =================================================
-        # AUTO RUN
-        # =================================================
+     
 
         self.auto_run = True
 
@@ -186,28 +168,19 @@ class CompetitiveGame:
 
         self.last_step_time = pygame.time.get_ticks()
 
-        # =================================================
-        # RENDERER COMPATIBILITY
-        # =================================================
+        
 
         self.update_renderer_boxes()
 
-    # =====================================================
-    # UPDATE BOX REFERENCES
-    # =====================================================
 
     def update_renderer_boxes(self):
 
-        # TileRenderer của bạn đang dùng:
-        # board.b1
-        # board.b2
+
 
         self.b1 = self.agent1_boxes
         self.b2 = self.agent2_boxes
 
-    # =====================================================
-    # SAVE STATE
-    # =====================================================
+
 
     def save_state(self):
 
@@ -236,9 +209,6 @@ class CompetitiveGame:
 
         self.history.append(state)
 
-    # =====================================================
-    # RESTORE STATE
-    # =====================================================
 
     def restore_state(self, state):
 
@@ -276,9 +246,7 @@ class CompetitiveGame:
 
         self.update_renderer_boxes()
 
-    # =====================================================
-    # SCORE
-    # =====================================================
+
 
     def get_score1(self):
 
@@ -294,9 +262,6 @@ class CompetitiveGame:
             & self.goals
         )
 
-    # =====================================================
-    # CHECK WIN
-    # =====================================================
 
     def check_game_over(self):
 
@@ -336,7 +301,7 @@ class CompetitiveGame:
 
             return
 
-        # Maximum steps reached
+        
         if self.step_count >= self.max_steps:
 
             self.game_over = True
@@ -359,9 +324,7 @@ class CompetitiveGame:
                     "Draw!"
                 )
 
-    # =====================================================
-    # MAKE ONE STEP
-    # =====================================================
+   
 
     def make_step(self):
 
@@ -370,9 +333,7 @@ class CompetitiveGame:
 
         self.save_state()
 
-        # -----------------------------
-        # Agent 1 chooses action
-        # -----------------------------
+
 
         started = time.perf_counter()
         action1 = self.agent1.get_action(
@@ -385,10 +346,7 @@ class CompetitiveGame:
         if time.perf_counter() - started > 1.0:
             action1 = "Wait"
 
-        # -----------------------------
-        # Agent 2 chooses action
-        # -----------------------------
-
+ 
         started = time.perf_counter()
         action2 = self.agent2.get_action(
             self.agent2_pos,
@@ -400,9 +358,7 @@ class CompetitiveGame:
         if time.perf_counter() - started > 1.0:
             action2 = "Wait"
 
-        # -----------------------------
-        # Simultaneous movement
-        # -----------------------------
+
 
         (
             new_p1,
@@ -427,9 +383,7 @@ class CompetitiveGame:
             self.goals
         )
 
-        # -----------------------------
-        # Update state
-        # -----------------------------
+
 
         self.agent1_pos = new_p1
         self.agent2_pos = new_p2
@@ -447,9 +401,7 @@ class CompetitiveGame:
         # Check winner
         self.check_game_over()
 
-    # =====================================================
-    # DRAW INFO
-    # =====================================================
+
 
     def draw_info(self):
 
@@ -533,9 +485,7 @@ class CompetitiveGame:
             (10, y + 55)
         )
 
-        # -----------------------------
-        # GAME OVER
-        # -----------------------------
+
 
         if self.game_over:
 
@@ -562,9 +512,6 @@ class CompetitiveGame:
                 rect
             )
 
-    # =====================================================
-    # DRAW BOARD
-    # =====================================================
 
     def draw_board(self):
 
@@ -590,9 +537,7 @@ class CompetitiveGame:
 
         pygame.display.flip()
 
-    # =====================================================
-    # RESTART
-    # =====================================================
+
 
     def restart(self):
 
@@ -638,9 +583,7 @@ class CompetitiveGame:
 
         self.update_renderer_boxes()
 
-    # =====================================================
-    # BACKWARD
-    # =====================================================
+   
 
     def backward(self):
 
@@ -655,9 +598,7 @@ class CompetitiveGame:
 
         self.paused = True
 
-    # =====================================================
-    # RUN
-    # =====================================================
+
 
     def run(self):
 
@@ -665,9 +606,6 @@ class CompetitiveGame:
 
         while running:
 
-            # =============================================
-            # EVENTS
-            # =============================================
 
             for event in pygame.event.get():
 
@@ -677,7 +615,6 @@ class CompetitiveGame:
 
                 elif event.type == pygame.KEYDOWN:
 
-                    # SPACE = PAUSE / RESUME
                     if event.key == pygame.K_SPACE:
 
                         self.paused = not self.paused
@@ -686,24 +623,18 @@ class CompetitiveGame:
                             pygame.time.get_ticks()
                         )
 
-                    # BACKWARD
                     elif event.key == pygame.K_LEFT:
 
                         self.backward()
 
-                    # RESTART
                     elif event.key == pygame.K_r:
 
                         self.restart()
 
-                    # ESC
                     elif event.key == pygame.K_ESCAPE:
 
                         running = False
-
-            # =============================================
-            # AUTO RUN
-            # =============================================
+            
 
             current_time = (
                 pygame.time.get_ticks()
@@ -727,9 +658,6 @@ class CompetitiveGame:
                         current_time
                     )
 
-            # =============================================
-            # DRAW
-            # =============================================
 
             self.draw_board()
 
@@ -738,9 +666,7 @@ class CompetitiveGame:
         pygame.quit()
 
 
-# =========================================================
-# RUN GAME
-# =========================================================
+
 
 def run_game(n_steps=25):
     game = CompetitiveGame(
@@ -752,9 +678,7 @@ def run_game(n_steps=25):
     game.run()
 
 
-# =========================================================
-# MAIN
-# =========================================================
+
 
 if __name__ == "__main__":
 
