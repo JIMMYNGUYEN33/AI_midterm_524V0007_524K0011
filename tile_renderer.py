@@ -50,7 +50,36 @@ class TileRenderer:
                         (self.tile_size, self.tile_size)
                     )
 
-                    if key == 'C':
+                    if key in ('C1', 'C2'):
+                        tint = (
+                            (40, 195, 85)
+                            if key == 'C1'
+                            else (220, 55, 65)
+                        )
+
+                        for x in range(img.get_width()):
+                            for y in range(img.get_height()):
+                                color = img.get_at((x, y))
+
+                                if color.a:
+                                    brightness = (
+                                        color.r * 299
+                                        + color.g * 587
+                                        + color.b * 114
+                                    ) / 255000
+                                    shade = 0.38 + 0.62 * brightness
+
+                                    img.set_at(
+                                        (x, y),
+                                        (
+                                            int(tint[0] * shade),
+                                            int(tint[1] * shade),
+                                            int(tint[2] * shade),
+                                            color.a
+                                        )
+                                    )
+
+                    elif key == 'C':
                         for x in range(img.get_width()):
                             for y in range(img.get_height()):
                                 color = img.get_at((x, y))
@@ -92,10 +121,10 @@ class TileRenderer:
                     surf.fill((100, 100, 100))
 
                 elif key == 'C1':
-                    surf.fill((0, 0, 255))
+                    surf.fill((40, 195, 85))
 
                 elif key == 'C2':
-                    surf.fill((255, 165, 0))
+                    surf.fill((220, 55, 65))
 
                 elif key == 'B':
                     surf.fill((150, 100, 50))
@@ -110,10 +139,10 @@ class TileRenderer:
                     surf.fill((0, 255, 0))
 
                 elif key == '1':
-                    surf.fill((0, 0, 255))
+                    surf.fill((40, 195, 85))
 
                 elif key == '2':
-                    surf.fill((255, 165, 0))
+                    surf.fill((220, 55, 65))
 
                 else:
                     surf.fill((200, 200, 200))
@@ -198,6 +227,12 @@ class TileRenderer:
                 # Nếu không có sprite
                 if sprite_key not in self.sprites:
                     sprite_key = ' '
+
+                if sprite_key == 'D':
+                    screen.blit(
+                        self.sprites[' '],
+                        (x, y)
+                    )
 
                 screen.blit(
                     self.sprites[sprite_key],

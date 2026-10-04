@@ -14,6 +14,7 @@ class Agent2Bot:
     def __init__(self, walls, goals):
         self.walls = set(walls)
         self.goals = set(goals)
+        self.last_nodes_expanded = 0
 
     def _plan_box(self, agent_start, box_start, target_goals, obstacles, deadline):
         start = (agent_start, box_start)
@@ -25,6 +26,7 @@ class Agent2Bot:
 
         while queue and time.time() < deadline:
             agent, box, path = queue.popleft()
+            self.last_nodes_expanded += 1
 
             if box in target_goals:
                 return path
@@ -102,6 +104,7 @@ class Agent2Bot:
         opp_boxes,
         neutral_boxes
     ):
+        self.last_nodes_expanded = 0
         deadline = time.time() + 0.75
 
         all_boxes = (

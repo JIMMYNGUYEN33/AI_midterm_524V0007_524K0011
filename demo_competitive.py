@@ -156,6 +156,8 @@ class CompetitiveGame:
         self.game_over = False
 
         self.result_text = ""
+        self.show_analysis = False
+        self.agent_stats = self._new_agent_stats()
 
      
 
@@ -182,6 +184,37 @@ class CompetitiveGame:
         self.b2 = self.agent2_boxes
 
 
+    @staticmethod
+    def _new_agent_stats():
+        return {
+            1: {
+                "calls": 0,
+                "expanded_nodes": 0,
+                "total_time": 0.0,
+                "max_time": 0.0,
+                "timeouts": 0
+            },
+            2: {
+                "calls": 0,
+                "expanded_nodes": 0,
+                "total_time": 0.0,
+                "max_time": 0.0,
+                "timeouts": 0
+            }
+        }
+
+
+    def record_agent_stats(self, agent_id, agent, elapsed):
+        stats = self.agent_stats[agent_id]
+        stats["calls"] += 1
+        stats["expanded_nodes"] += agent.last_nodes_expanded
+        stats["total_time"] += elapsed
+        stats["max_time"] = max(stats["max_time"], elapsed)
+
+        if elapsed > 1.0:
+            stats["timeouts"] += 1
+
+
 
     def save_state(self):
 
@@ -199,7 +232,12 @@ class CompetitiveGame:
             "neutral_boxes": set(self.neutral_boxes),
             "step_count": self.step_count,
             "game_over": self.game_over,
-            "result_text": self.result_text
+            "result_text": self.result_text,
+            "show_analysis": self.show_analysis,
+            "agent_stats": {
+                agent_id: stats.copy()
+                for agent_id, stats in self.agent_stats.items()
+            }
         }
 
 
@@ -236,6 +274,11 @@ class CompetitiveGame:
         self.result_text = (
             state["result_text"]
         )
+        self.show_analysis = state["show_analysis"]
+        self.agent_stats = {
+            agent_id: stats.copy()
+            for agent_id, stats in state["agent_stats"].items()
+        }
 
         self.update_renderer_boxes()
 
@@ -273,6 +316,7 @@ class CompetitiveGame:
         if boxes_on_goals == total_goals:
 
             self.game_over = True
+            self.show_analysis = True
 
             if score1 > score2:
 
@@ -298,6 +342,7 @@ class CompetitiveGame:
         if self.step_count >= self.max_steps:
 
             self.game_over = True
+            self.show_analysis = True
 
             if score1 > score2:
 
@@ -336,7 +381,9 @@ class CompetitiveGame:
             self.agent2_boxes,
             self.neutral_boxes
         )
-        if time.perf_counter() - started > 1.0:
+        elapsed1 = time.perf_counter() - started
+        self.record_agent_stats(1, self.agent1, elapsed1)
+        if elapsed1 > 1.0:
             action1 = "Wait"
 
  
@@ -348,7 +395,9 @@ class CompetitiveGame:
             self.agent1_boxes,
             self.neutral_boxes
         )
-        if time.perf_counter() - started > 1.0:
+        elapsed2 = time.perf_counter() - started
+        self.record_agent_stats(2, self.agent2, elapsed2)
+        if elapsed2 > 1.0:
             action2 = "Wait"
 
 
@@ -509,6 +558,11 @@ class CompetitiveGame:
 
     def draw_board(self):
 
+        if self.game_over and self.show_analysis:
+            self.draw_analysis()
+            pygame.display.flip()
+            return
+
         # TileRenderer uses:
         #
         # wall.png
@@ -530,6 +584,142 @@ class CompetitiveGame:
         self.draw_info()
 
         pygame.display.flip()
+
+
+    def draw_analysis(self):
+
+        self.screen.fill((242, 244, 238))
+
+        title_font = pygame.font.SysFont(None, 44)
+        header_font = pygame.font.SysFont(None, 28)
+        body_font = pygame.font.SysFont(None, 22)
+        small_font = pygame.font.SysFont(None, 18)
+
+        title = title_font.render(
+            "MATCH ANALYSIS",
+            True,
+            (28, 38, 34)
+        )
+        self.screen.blit(title, (28, 22))
+
+        result = header_font.render(
+            f"{self.result_text}   |   Steps: {self.step_count}/{self.max_steps}",
+            True,
+            (35, 105, 65)
+        )
+        self.screen.blit(result, (30, 70))
+
+        margin = 28
+        label_width = min(250, self.screen_width // 3)
+        column_width = (
+            self.screen_width - 2 * margin - label_width
+        ) // 2
+        agent1_x = margin + label_width
+        agent2_x = agent1_x + column_width
+        table_top = 120
+
+        pygame.draw.rect(
+            self.screen,
+            (220, 238, 224),
+            (agent1_x, table_top, column_width - 6, 38)
+        )
+        pygame.draw.rect(
+            self.screen,
+            (245, 224, 226),
+            (agent2_x, table_top, column_width - 6, 38)
+        )
+
+        self.screen.blit(
+            header_font.render("Agent 1", True, (25, 125, 65)),
+            (agent1_x + 10, table_top + 7)
+        )
+        self.screen.blit(
+            header_font.render("Agent 2", True, (185, 45, 60)),
+            (agent2_x + 10, table_top + 7)
+        )
+
+        stats1 = self.agent_stats[1]
+        stats2 = self.agent_stats[2]
+
+        def average_time(stats):
+            if not stats["calls"]:
+                return 0.0
+            return stats["total_time"] * 1000 / stats["calls"]
+
+        rows = (
+            ("Decisions", str(stats1["calls"]), str(stats2["calls"])),
+            (
+                "Expanded BFS states",
+                f"{stats1['expanded_nodes']:,}",
+                f"{stats2['expanded_nodes']:,}"
+            ),
+            (
+                "Total decision time",
+                f"{stats1['total_time'] * 1000:.1f} ms",
+                f"{stats2['total_time'] * 1000:.1f} ms"
+            ),
+            (
+                "Average per decision",
+                f"{average_time(stats1):.2f} ms",
+                f"{average_time(stats2):.2f} ms"
+            ),
+            (
+                "Peak per decision",
+                f"{stats1['max_time'] * 1000:.2f} ms",
+                f"{stats2['max_time'] * 1000:.2f} ms"
+            ),
+            (
+                "Over 1,000 ms",
+                str(stats1["timeouts"]),
+                str(stats2["timeouts"])
+            ),
+            (
+                "Goals secured",
+                f"{self.get_score1()} / {len(self.goals)}",
+                f"{self.get_score2()} / {len(self.goals)}"
+            )
+        )
+
+        row_height = 43
+        for index, (label, value1, value2) in enumerate(rows):
+            y = table_top + 48 + index * row_height
+            pygame.draw.line(
+                self.screen,
+                (205, 211, 203),
+                (margin, y + row_height - 5),
+                (self.screen_width - margin, y + row_height - 5),
+                1
+            )
+            self.screen.blit(
+                body_font.render(label, True, (52, 59, 54)),
+                (margin, y + 5)
+            )
+            self.screen.blit(
+                body_font.render(value1, True, (25, 125, 65)),
+                (agent1_x + 10, y + 5)
+            )
+            self.screen.blit(
+                body_font.render(value2, True, (185, 45, 60)),
+                (agent2_x + 10, y + 5)
+            )
+
+        note_y = table_top + 48 + len(rows) * row_height + 4
+        note = small_font.render(
+            "Node count sums BFS states removed from the queue across box candidates.",
+            True,
+            (90, 98, 91)
+        )
+        self.screen.blit(note, (margin, note_y))
+
+        footer = small_font.render(
+            "TAB: Board / Analysis    R: Restart    ESC: Exit",
+            True,
+            (65, 72, 66)
+        )
+        self.screen.blit(
+            footer,
+            (margin, self.screen_height - 26)
+        )
 
 
 
@@ -569,6 +759,8 @@ class CompetitiveGame:
         self.game_over = False
 
         self.result_text = ""
+        self.show_analysis = False
+        self.agent_stats = self._new_agent_stats()
 
         self.paused = True
 
@@ -664,6 +856,11 @@ class CompetitiveGame:
                     elif event.key == pygame.K_r:
 
                         self.restart()
+
+                    elif event.key == pygame.K_TAB:
+
+                        if self.game_over:
+                            self.show_analysis = not self.show_analysis
 
                     elif event.key == pygame.K_ESCAPE:
 
