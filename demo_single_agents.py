@@ -71,7 +71,7 @@ class GameApp:
         )
 
         pygame.display.set_caption(
-            f"Sokoban TDTU - {algorithm}"
+            f"Sokoban - {algorithm}"
         )
 
         self.renderer = TileRenderer(
@@ -229,7 +229,7 @@ class GameApp:
 
         draw_text(
             self.screen,
-            f"Mode: {self.algorithm}    Step: {self.current_step} / {path_length}",
+            f"Mode: {self.algorithm}    Steps: {self.current_step} / {path_length}",
             self.font,
             (20, 20, 20),
             10,
@@ -398,7 +398,7 @@ def select_algorithm():
     pygame.font.init()
 
     screen = pygame.display.set_mode((560, 380))
-    pygame.display.set_caption("Sokoban TDTU - Select Algorithm")
+    pygame.display.set_caption("Sokoban - Select Algorithm")
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont("Impact", 36)

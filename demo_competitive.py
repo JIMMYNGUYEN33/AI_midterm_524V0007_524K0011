@@ -401,7 +401,7 @@ class CompetitiveGame:
             "agent2_time": elapsed2
         })
         print(
-            f"Step {self.step_count}: "
+            f"Steps {self.step_count}: "
             f"Agent 1={action1} ({self.agent1.last_nodes_expanded} nodes, "
             f"{elapsed1 * 1000:.2f} ms); "
             f"Agent 2={action2} ({self.agent2.last_nodes_expanded} nodes, "
@@ -438,7 +438,7 @@ class CompetitiveGame:
         )
 
         text1 = (
-            f"Step: {self.step_count}"
+            f"Steps: {self.step_count}"
             f"/{self.max_steps}"
         )
 
@@ -727,7 +727,7 @@ def select_max_steps():
     pygame.font.init()
 
     screen = pygame.display.set_mode((560, 480))
-    pygame.display.set_caption("Sokoban - Map 2 Setup")
+    pygame.display.set_caption("Sokoban - Competitive Mode - Select Turn Limit and Algorithms")
     clock = pygame.time.Clock()
 
     title_font = pygame.font.SysFont("Impact", 34)
@@ -840,7 +840,7 @@ def select_max_steps():
             border_radius=12
         )
 
-        title = title_font.render("SOKOBAN - MAP 2", True, ink)
+        title = title_font.render("SOKOBAN - COMPETITIVE MODE", True, ink)
         screen.blit(title, title.get_rect(center=(280, 70)))
 
         subtitle = font.render("Choose an algorithm for each agent", True, ink)
