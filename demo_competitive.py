@@ -13,12 +13,16 @@ class CompetitiveGame:
 
     def __init__(
         self,
-        map_file="maps/competitive_map.txt"
+        map_file="maps/competitive_map.txt",
+        agent1_algorithm="BFS",
+        agent2_algorithm="BFS"
     ):
 
         pygame.init()
 
         self.map_file = map_file
+        self.agent1_algorithm = agent1_algorithm.upper()
+        self.agent2_algorithm = agent2_algorithm.upper()
 
         with open(
             map_file,
@@ -128,12 +132,14 @@ class CompetitiveGame:
 
         self.agent1 = Agent1Bot(
             self.walls,
-            self.goals
+            self.goals,
+            self.agent1_algorithm
         )
 
         self.agent2 = Agent2Bot(
             self.walls,
-            self.goals
+            self.goals,
+            self.agent2_algorithm
         )
 
         self.step_count = 0
@@ -280,7 +286,12 @@ class CompetitiveGame:
                 else self.get_score2()
             )
 
-            print(f"\nAgent {agent_id}")
+            algorithm = (
+                self.agent1_algorithm
+                if agent_id == 1
+                else self.agent2_algorithm
+            )
+            print(f"\nAgent {agent_id} ({algorithm})")
             print("Actions:", actions)
             print("Total cost:", len(actions))
             print("Expanded nodes:", nodes)
@@ -294,38 +305,6 @@ class CompetitiveGame:
 
         score1 = self.get_score1()
         score2 = self.get_score2()
-
-        total_goals = len(
-            self.goals
-        )
-
-        boxes_on_goals = (
-            score1 + score2
-        )
-
-        if boxes_on_goals == total_goals:
-
-            self.game_over = True
-
-            if score1 > score2:
-
-                self.result_text = (
-                    "Agent 1 wins!"
-                )
-
-            elif score2 > score1:
-
-                self.result_text = (
-                    "Agent 2 wins!"
-                )
-
-            else:
-
-                self.result_text = (
-                    "Draw!"
-                )
-
-            return
 
         if self.step_count >= self.max_steps:
 
@@ -464,24 +443,20 @@ class CompetitiveGame:
         )
 
         text2 = (
-            f"Agent 1: {self.get_score1()}    "
-            f"Agent 2: {self.get_score2()}"
+            f"Agent 1 [{self.agent1_algorithm}]: {self.get_score1()}    "
+            f"Agent 2 [{self.agent2_algorithm}]: {self.get_score2()}"
         )
 
         if self.paused:
 
             text3 = (
-                "PAUSED - SPACE = Resume    "
-                "R = Restart    ESC = Exit"
+                "PAUSED | SPACE: Resume | LEFT: Back | RIGHT: Forward | R: Restart | ESC: Exit"
             )
 
         else:
 
             text3 = (
-                "AUTO RUN    "
-                "SPACE = Pause    "
-                "LEFT = Backward    "
-                "R = Restart"
+                "AUTO RUN | SPACE: Pause | LEFT: Back | RIGHT: Forward | R: Restart | ESC: Exit"
             )
 
         surface1 = font.render(
@@ -559,7 +534,9 @@ class CompetitiveGame:
 
         max_steps = self.max_steps
         new_game = CompetitiveGame(
-            self.map_file
+            self.map_file,
+            self.agent1_algorithm,
+            self.agent2_algorithm
         )
 
         self.agent1_pos = (
@@ -733,9 +710,11 @@ class CompetitiveGame:
 
         pygame.quit()
 
-def run_game(n_steps=25):
+def run_game(n_steps=25, agent1_algorithm="BFS", agent2_algorithm="BFS"):
     game = CompetitiveGame(
-        "maps/competitive_map.txt"
+        "maps/competitive_map.txt",
+        agent1_algorithm,
+        agent2_algorithm
     )
 
     game.max_steps = n_steps
@@ -747,7 +726,7 @@ def select_max_steps():
     pygame.init()
     pygame.font.init()
 
-    screen = pygame.display.set_mode((560, 400))
+    screen = pygame.display.set_mode((560, 480))
     pygame.display.set_caption("Sokoban - Map 2 Setup")
     clock = pygame.time.Clock()
 
@@ -755,15 +734,31 @@ def select_max_steps():
     font = pygame.font.SysFont("Arial", 21, bold=True)
     small_font = pygame.font.SysFont("Arial", 16)
 
-    step_field = pygame.Rect(165, 190, 230, 56)
-    start_button = pygame.Rect(180, 285, 200, 54)
+    step_field = pygame.Rect(165, 300, 230, 52)
+    start_button = pygame.Rect(180, 395, 200, 50)
     steps_text = "25"
     field_focused = True
     error_text = ""
+    algorithms = ("BFS", "UCS", "A*")
+    selected_algorithms = ["BFS", "BFS"]
+    algorithm_buttons = [
+        [pygame.Rect(175 + index * 95, y, 82, 40) for index in range(3)]
+        for y in (155, 220)
+    ]
     background = (135, 206, 235)
     ink = (34, 54, 75)
     accent = (49, 112, 164)
     pygame.key.start_text_input()
+
+    def selected_settings():
+        try:
+            steps = int(steps_text)
+        except ValueError:
+            steps = 0
+
+        if steps > 0:
+            return steps, selected_algorithms[0], selected_algorithms[1]
+        return None
 
     while True:
 
@@ -782,15 +777,11 @@ def select_max_steps():
                     return None
 
                 if event.key == pygame.K_RETURN:
-                    try:
-                        steps = int(steps_text)
-                    except ValueError:
-                        steps = 0
-
-                    if steps > 0:
+                    settings = selected_settings()
+                    if settings:
                         pygame.key.stop_text_input()
                         pygame.quit()
-                        return steps
+                        return settings
 
                     error_text = "Enter a number of steps greater than 0."
 
@@ -809,22 +800,34 @@ def select_max_steps():
                     error_text = ""
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                selected_button = next(
+                    (
+                        (agent_index, algorithm_index)
+                        for agent_index, row in enumerate(algorithm_buttons)
+                        for algorithm_index, button in enumerate(row)
+                        if button.collidepoint(event.pos)
+                    ),
+                    None
+                )
+
+                if selected_button is not None:
+                    agent_index, algorithm_index = selected_button
+                    selected_algorithms[agent_index] = algorithms[algorithm_index]
+                    field_focused = False
+                    pygame.key.stop_text_input()
+
                 field_focused = step_field.collidepoint(event.pos)
                 if field_focused:
                     pygame.key.start_text_input()
-                else:
+                elif selected_button is None:
                     pygame.key.stop_text_input()
 
                 if start_button.collidepoint(event.pos):
-                    try:
-                        steps = int(steps_text)
-                    except ValueError:
-                        steps = 0
-
-                    if steps > 0:
+                    settings = selected_settings()
+                    if settings:
                         pygame.key.stop_text_input()
                         pygame.quit()
-                        return steps
+                        return settings
 
                     error_text = "Enter a number of steps greater than 0."
 
@@ -833,15 +836,37 @@ def select_max_steps():
         pygame.draw.rect(
             screen,
             (248, 250, 252),
-            (40, 35, 480, 330),
-            border_radius=20
+            (30, 25, 500, 430),
+            border_radius=12
         )
 
         title = title_font.render("SOKOBAN - MAP 2", True, ink)
-        screen.blit(title, title.get_rect(center=(280, 91)))
+        screen.blit(title, title.get_rect(center=(280, 70)))
 
-        subtitle = font.render("Enter the step limit", True, ink)
-        screen.blit(subtitle, subtitle.get_rect(center=(280, 145)))
+        subtitle = font.render("Choose an algorithm for each agent", True, ink)
+        screen.blit(subtitle, subtitle.get_rect(center=(280, 112)))
+
+        for agent_index, label in enumerate(("Agent 1", "Agent 2")):
+            label_surface = font.render(label, True, ink)
+            screen.blit(label_surface, (65, algorithm_buttons[agent_index][0].y + 8))
+
+            for algorithm_index, button in enumerate(algorithm_buttons[agent_index]):
+                selected = selected_algorithms[agent_index] == algorithms[algorithm_index]
+                pygame.draw.rect(
+                    screen,
+                    accent if selected else (224, 233, 241),
+                    button,
+                    border_radius=6
+                )
+                label_surface = small_font.render(
+                    algorithms[algorithm_index],
+                    True,
+                    (255, 255, 255) if selected else ink
+                )
+                screen.blit(label_surface, label_surface.get_rect(center=button.center))
+
+        steps_title = font.render("Turn limit", True, ink)
+        screen.blit(steps_title, steps_title.get_rect(center=(280, 275)))
 
         pygame.draw.rect(
             screen,
@@ -881,14 +906,14 @@ def select_max_steps():
 
         if error_text:
             error = small_font.render(error_text, True, (190, 58, 50))
-            screen.blit(error, error.get_rect(center=(280, 260)))
+            screen.blit(error, error.get_rect(center=(280, 370)))
         else:
             hint = small_font.render(
-                "Press Enter or click the button to start",
+                "Enter the turn limit, then start the match",
                 True,
                 (104, 119, 132)
             )
-            screen.blit(hint, hint.get_rect(center=(280, 260)))
+            screen.blit(hint, hint.get_rect(center=(280, 370)))
 
         pygame.display.flip()
         clock.tick(30)
@@ -896,6 +921,11 @@ def select_max_steps():
 if __name__ == "__main__":
 
     if len(sys.argv) > 1:
+        if len(sys.argv) > 4:
+            raise SystemExit(
+                "Usage: python demo_competitive.py [steps] [BFS|UCS|A*] [BFS|UCS|A*]"
+            )
+
         try:
             steps = int(sys.argv[1])
         except ValueError as error:
@@ -906,9 +936,16 @@ if __name__ == "__main__":
         if steps < 1:
             raise SystemExit("The number of steps must be positive.")
 
-        run_game(steps)
-    else:
-        steps = select_max_steps()
+        choices = [argument.upper() for argument in sys.argv[2:]]
+        choices += ["BFS"] * (2 - len(choices))
+        if any(algorithm not in {"BFS", "UCS", "A*"} for algorithm in choices):
+            raise SystemExit(
+                "Algorithms must be BFS, UCS, or A*."
+            )
 
-        if steps is not None:
-            run_game(steps)
+        run_game(steps, choices[0], choices[1])
+    else:
+        settings = select_max_steps()
+
+        if settings is not None:
+            run_game(*settings)

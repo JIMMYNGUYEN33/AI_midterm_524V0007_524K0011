@@ -114,23 +114,27 @@ def simultaneous_step(
 
     else:
 
-        if push1 and (
-            push1[1] == t2
-            or push1[1] == p2
-        ):
-
-            if priority != 1:
-                t1 = p1
-                push1 = None
-
-        if push2 and (
-            push2[1] == t1
-            or push2[1] == p1
-        ):
-
-            if priority != 2:
+        if push1 and push1[1] == t2:
+            if priority == 1 and p2 != push1[1]:
                 t2 = p2
                 push2 = None
+            else:
+                t1 = p1
+                push1 = None
+        elif push1 and push1[1] == p2 and priority != 1:
+            t1 = p1
+            push1 = None
+
+        if push2 and push2[1] == t1:
+            if priority == 2 and p1 != push2[1]:
+                t1 = p1
+                push1 = None
+            else:
+                t2 = p2
+                push2 = None
+        elif push2 and push2[1] == p1 and priority != 2:
+            t2 = p2
+            push2 = None
 
         if push1 and push2:
 

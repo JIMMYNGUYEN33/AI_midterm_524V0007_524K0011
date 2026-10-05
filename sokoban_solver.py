@@ -193,7 +193,7 @@ def _search(problem, use_heuristic, time_limit):
     while frontier:
         elapsed = time.perf_counter() - start_time
         if elapsed > time_limit:
-            return [], nodes_expanded, elapsed
+            return None, nodes_expanded, elapsed
 
         _, _, current_cost, current = heapq.heappop(frontier)
         if current_cost != cost_so_far.get(current):
@@ -221,7 +221,7 @@ def _search(problem, use_heuristic, time_limit):
             )
 
     elapsed = time.perf_counter() - start_time
-    return [], nodes_expanded, elapsed
+    return None, nodes_expanded, elapsed
 
 
 def _search_ucs(problem, time_limit):
@@ -252,7 +252,7 @@ def _search_ucs(problem, time_limit):
     while frontier:
         elapsed = time.perf_counter() - start_time
         if elapsed > time_limit:
-            return [], nodes_expanded, elapsed
+            return None, nodes_expanded, elapsed
 
         current = frontier.popleft()
         agent = current & position_mask
@@ -289,7 +289,7 @@ def _search_ucs(problem, time_limit):
             frontier.append(next_state)
 
     elapsed = time.perf_counter() - start_time
-    return [], nodes_expanded, elapsed
+    return None, nodes_expanded, elapsed
 
 
 def solve_astar(problem, time_limit=30):
@@ -304,9 +304,9 @@ if __name__ == "__main__":
     for name, solver in (("A*", solve_astar), ("UCS", solve_ucs)):
         problem = SokobanProblem("maps/example_map.txt")
         path, nodes, elapsed = solver(problem)
-        status = "SUCCESS" if path else "FAILED"
+        status = "SUCCESS" if path is not None else "FAILED"
         print(f"{name} {status}")
-        print(f"Cost: {len(path)}")
+        print(f"Cost: {len(path) if path is not None else 'N/A'}")
         print(f"Nodes: {nodes}")
         print(f"Time: {elapsed:.3f} seconds")
         print()

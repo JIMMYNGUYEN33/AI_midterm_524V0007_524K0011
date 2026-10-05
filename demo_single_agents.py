@@ -102,7 +102,7 @@ class GameApp:
             self.map_file
         )
 
-        self.path = []
+        self.path = None
 
         self.states = []
 
@@ -134,7 +134,7 @@ class GameApp:
         print("Nodes:", nodes_expanded)
         print(f"Time: {elapsed:.3f} seconds")
 
-        if not self.path:
+        if self.path is None:
 
             print(
                 "No solution found."
@@ -212,10 +212,12 @@ class GameApp:
             (0, y, self.screen_w, self.hud_height)
         )
 
-        if not self.path:
+        path_length = len(self.path) if self.path is not None else 0
+
+        if self.path is None:
             status_text = "NO SOLUTION"
             color_status = (231, 76, 60)
-        elif self.current_step >= len(self.path):
+        elif self.current_step >= path_length:
             status_text = "FINISHED"
             color_status = (46, 204, 113)
         elif self.auto_play:
@@ -227,7 +229,7 @@ class GameApp:
 
         draw_text(
             self.screen,
-            f"Mode: {self.algorithm}    Step: {self.current_step} / {len(self.path)}",
+            f"Mode: {self.algorithm}    Step: {self.current_step} / {path_length}",
             self.font,
             (20, 20, 20),
             10,
@@ -290,6 +292,8 @@ class GameApp:
                         self.auto_play = False
 
                         if (
+                            self.path is not None
+                            and
                             self.current_step
                             < len(self.path)
                         ):
@@ -330,13 +334,14 @@ class GameApp:
                 if left_held:
                     if self.current_step > 0:
                         self.current_step -= 1
-                elif self.current_step < len(self.path):
+                elif self.path is not None and self.current_step < len(self.path):
                     self.current_step += 1
 
                 last_manual_step_time = current_time
 
             if (
                 self.auto_play
+                and self.path is not None
                 and
                 self.current_step
                 < len(self.path)
